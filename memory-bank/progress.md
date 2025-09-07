@@ -99,9 +99,26 @@
 
 **Result**: Graceful handling of all container states
 
-## Current Issue to Fix
-- Manager container exits immediately with code 1
-- Error: `unknown option '--porcelain'` (git command issue in manager-runner.ts)
+## ✅ Manager Launch Issue Fixed (COMPLETED)
+**Problem**: Manager container exiting with `unknown option '--porcelain'` error
+**Root Causes**:
+- Markdown backticks in manager.md prompt being interpreted by shell
+- Incorrect Docker paths for manager-runner.js
+- Shell expansion issues with prompt passing
+
+**Solution Implemented**:
+- Removed backticks from git command in manager.md prompt
+- Fixed Docker paths to use /workspace/dist/ instead of /usr/local/lib/claudo/dist/
+- Changed prompt passing from shell substitution to cat piping
+- Added debug logging to track command execution
+
+**Result**: Manager now launches successfully and reads memory bank files!
+
+## Current Issue: Manager Hanging
+- Manager starts successfully and reads memory bank
+- Executes initial tools (git status, read queue) properly
+- Appears to hang after initial executions
+- May be stream parsing or agent communication issue
 
 ## Future Testing Phase  
 1. **Planning System Test**: Create sample hierarchical tasks using updated agents

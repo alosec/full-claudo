@@ -94,10 +94,24 @@ Sample task ready: "Add --version flag to claudo command"
   - Better error messages for missing Docker image
 - **Result**: Graceful handling of all container states
 
-## Current Issue: Manager Container Exiting
-- Container starts but immediately exits with code 1
-- Error shows: `unknown option '--porcelain'` (likely git command issue)
-- Need to investigate manager-runner.ts git commands
+## ✅ Manager Launch Fixed (COMPLETED)
+- **Problem**: Container exiting with `unknown option '--porcelain'` error
+- **Root Causes Identified**:
+  1. Markdown backticks in manager.md prompt were being interpreted by shell
+  2. Docker container trying to run wrong path for manager-runner.js
+  3. Shell expansion issues with prompt passing
+- **Solution Implemented**:
+  - Removed backticks from git command in manager.md prompt
+  - Fixed Docker paths to use /workspace/dist/ instead of /usr/local/lib/claudo/dist/
+  - Changed prompt passing from shell substitution to cat piping
+  - Added debug logging to track command execution
+- **Result**: Manager now launches successfully and reads memory bank!
+
+## Current Issue: Manager Hanging After Initial Reads
+- Manager successfully starts and reads memory bank files
+- Executes git status and reads task queue properly
+- But appears to hang after initial tool executions
+- May be waiting for stream parsing or agent response
 
 ## Future Testing Phase
 1. **Test Planning System**: Create sample hierarchical tasks using updated agents

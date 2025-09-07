@@ -7,14 +7,8 @@ import { ClaudeStreamParser } from './parser';
 
 // Run Manager Claude within container with streaming output
 function runManager() {
-  // Look for prompts in container location first, then local
-  let managerPrompt: string;
-  try {
-    managerPrompt = readFileSync('/usr/local/lib/claudo/prompts/manager.md', 'utf8');
-  } catch (e) {
-    // Fallback to local prompts directory
-    managerPrompt = readFileSync('./prompts/manager.md', 'utf8');
-  }
+  // Read prompt from workspace prompts directory
+  const managerPrompt = readFileSync('./prompts/manager.md', 'utf8');
   
   // Ensure .claudo directory exists
   const claudoDir = path.join(process.cwd(), '.claudo');
@@ -35,18 +29,18 @@ function runManager() {
   writeFileSync(tempPromptFile, managerPrompt);
   
   console.log('[claudo] Starting Manager with streaming JSON bus...');
+  console.log('[claudo] DEBUG: Prompt file saved to:', tempPromptFile);
+  console.log('[claudo] DEBUG: Prompt length:', managerPrompt.length);
+  
+  // Use cat to read the file and pipe to claude - avoids shell expansion issues
+  const fullCommand = `cat "${tempPromptFile}" | claude --dangerously-skip-permissions --output-format stream-json --input-format text --verbose --model sonnet`;
+  
+  console.log('[claudo] DEBUG: Executing command via bash -c');
+  console.log('[claudo] DEBUG: Command:', fullCommand);
   
   // Spawn Claude Manager process
-  const manager = spawn('claude', [
-    '-p', `$(cat ${tempPromptFile})`,
-    '--dangerously-skip-permissions',
-    '--output-format', 'stream-json',
-    '--input-format', 'text',
-    '--verbose',
-    '--model', 'sonnet'
-  ], {
+  const manager = spawn('bash', ['-c', fullCommand], {
     stdio: ['pipe', 'pipe', 'inherit'],
-    shell: true,
     cwd: process.cwd()
   });
   

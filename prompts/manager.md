@@ -54,7 +54,7 @@ Always read memory-bank first for context, then check planning/INDEX.md for curr
 
 1. Read memory-bank files to get oriented
 2. Check planning/INDEX.md for active tasks
-3. Check `git status --porcelain` to ensure clean state
+3. Check git status --porcelain to ensure clean state
 4. Read next task from `.claudo/queue.txt` OR planning/tasks/
 5. If no plan exists, spawn Planner: `node /usr/local/lib/claudo/dist/agent.js plan "create plan for <task> in planning/tasks/<task-name>/"`
 6. Review plan, optionally get Critic review: `node /usr/local/lib/claudo/dist/agent.js critic "review plan for <task>"`

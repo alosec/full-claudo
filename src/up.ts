@@ -33,10 +33,10 @@ function spawnManager() {
     -v "$(pwd):/workspace" \
     -v "$HOME/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro" \
     -v "$HOME/.claude/settings.json:/home/node/.claude/settings.json:ro" \
-    -e PATH="/workspace:/usr/local/lib/claudo/dist:$PATH" \
+    -e PATH="/workspace/dist:$PATH" \
     -w /workspace \
     claudo-container \
-    node /usr/local/lib/claudo/dist/manager-runner.js`;
+    node /workspace/dist/manager-runner.js`;
   
   console.log('[claudo] Spawning Manager with streaming JSON bus...');
   
