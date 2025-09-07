@@ -62,10 +62,8 @@ Brief description of what was accomplished
 - Future improvements suggested
 
 ## Time Spent
-- Planning: X minutes
-- Implementation: Y minutes
-- Testing: Z minutes
-- Total: N minutes
+- Optional section for tracking actual time if measured
+- Only include if time was actually tracked during work
 
 ## Commit Reference
 - Commit: [git hash]
