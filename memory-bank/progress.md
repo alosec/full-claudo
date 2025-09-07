@@ -76,12 +76,32 @@
 - Structured planning system works ✅
 - Automated work logging works ✅
 
-## Next Phase: Infrastructure & Accessibility
-1. **Docker Container Rebuild**: Update container with latest TypeScript changes and planning system
-2. **Script Accessibility Fix**: Ensure claudo script works from any project directory, not just full-claudo/
-3. **Global Command Setup**: Make claudo globally available and properly configured
-4. **Cross-Project Testing**: Verify system works when invoked from different directories
-5. **Container Validation**: Test planning system initialization in rebuilt container
+## ✅ NPM Link Implementation (COMPLETED)
+**Problem**: `claudo` command was a hardcoded bash script that didn't auto-update with code changes
+**Solution**: 
+- Created TypeScript CLI entry point (`src/cli.ts`) with proper hashbang
+- Added bin field to package.json for npm link support  
+- Ran `npm link` to create global symlink
+- Removed old bash script from `/usr/local/bin/claudo`
+
+**Benefits**:
+- Auto-updates when rebuilding TypeScript (no manual copying)
+- Works globally from any directory
+- Includes --version and --help commands
+- Properly integrated logs command
+
+## ✅ Container Conflict Resolution (COMPLETED)
+**Problem**: `claudo up` would fail with "container name already in use" error
+**Solution**: Enhanced `up.ts` with proper container state checking
+- Detects if container is running and provides helpful message
+- Automatically removes stopped/exited containers
+- Better error messages for missing Docker image
+
+**Result**: Graceful handling of all container states
+
+## Current Issue to Fix
+- Manager container exits immediately with code 1
+- Error: `unknown option '--porcelain'` (git command issue in manager-runner.ts)
 
 ## Future Testing Phase  
 1. **Planning System Test**: Create sample hierarchical tasks using updated agents

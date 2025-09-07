@@ -3,10 +3,15 @@
   "version": "1.0.0",
   "description": "Simple multi-agent Claude system",
   "main": "dist/index.js",
+  "bin": {
+    "claudo": "./dist/cli.js"
+  },
   "scripts": {
     "build": "tsc",
-    "start": "npm run build && ./claudo up",
-    "stop": "./claudo down"
+    "start": "npm run build && claudo up",
+    "stop": "claudo down",
+    "logs": "claudo logs",
+    "postinstall": "npm run build"
   },
   "keywords": ["claude", "multi-agent", "automation"],
   "author": "Alex",

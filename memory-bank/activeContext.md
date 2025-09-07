@@ -73,12 +73,31 @@ Sample task ready: "Add --version flag to claudo command"
   - Auto-initialization of planning directories in manager-runner.ts
 - **Result**: Manager can now create organized task hierarchies and automatically log completed work
 
-## Next Phase: Docker Container Rebuild & Script Accessibility
-1. **Rebuild Docker Container**: Update container with latest changes including planning system
-2. **Fix Docker Script Availability**: Make claudo script work from any project directory
-3. **Simplify Script Access**: Ensure claudo command is globally available and properly configured
-4. **Test Cross-Project Usage**: Verify system works when invoked from different project directories
-5. **Validate Updated Container**: Ensure planning system initialization works in rebuilt container
+## ✅ Global NPM Link Implementation (COMPLETED)
+- **Problem Solved**: `claudo` command was hardcoded bash script that didn't auto-update
+- **Solution Implemented**: 
+  - Created TypeScript CLI entry point (`src/cli.ts`) with proper hashbang
+  - Added bin field to package.json for npm link support
+  - Removed old bash script from `/usr/local/bin/claudo`
+  - Now uses npm global symlink at `~/.nvm/versions/node/v20.19.0/bin/claudo`
+- **Benefits**:
+  - Auto-updates when rebuilding TypeScript (no manual copying)
+  - Works globally from any directory
+  - Includes --version and --help commands
+  - Properly integrated logs command
+
+## ✅ Container Conflict Handling (COMPLETED)
+- **Problem Solved**: `claudo up` would fail if container already existed
+- **Solution Implemented**: Enhanced `up.ts` with proper container state checking:
+  - Detects if container is running and provides helpful message
+  - Automatically removes stopped/exited containers
+  - Better error messages for missing Docker image
+- **Result**: Graceful handling of all container states
+
+## Current Issue: Manager Container Exiting
+- Container starts but immediately exits with code 1
+- Error shows: `unknown option '--porcelain'` (likely git command issue)
+- Need to investigate manager-runner.ts git commands
 
 ## Future Testing Phase
 1. **Test Planning System**: Create sample hierarchical tasks using updated agents
