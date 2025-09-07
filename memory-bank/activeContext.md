@@ -73,12 +73,18 @@ Sample task ready: "Add --version flag to claudo command"
   - Auto-initialization of planning directories in manager-runner.ts
 - **Result**: Manager can now create organized task hierarchies and automatically log completed work
 
-## Next Phase: Full System Testing
+## Next Phase: Docker Container Rebuild & Script Accessibility
+1. **Rebuild Docker Container**: Update container with latest changes including planning system
+2. **Fix Docker Script Availability**: Make claudo script work from any project directory
+3. **Simplify Script Access**: Ensure claudo command is globally available and properly configured
+4. **Test Cross-Project Usage**: Verify system works when invoked from different project directories
+5. **Validate Updated Container**: Ensure planning system initialization works in rebuilt container
+
+## Future Testing Phase
 1. **Test Planning System**: Create sample hierarchical tasks using updated agents
 2. **Test Manager**: Run Manager with real tasks from queue using new planning system
 3. **Verify Agent Communication**: Manager → Planner → Worker → Critic flow with planning integration
 4. **Validate Work Logging**: Ensure automatic work-log creation when tasks complete
-5. **Document Issues**: Track any remaining bugs or improvements needed
 
 ## Key Achievements
 **Simple Architecture Proven**: ~100 lines of TypeScript successfully orchestrates Claude instances
