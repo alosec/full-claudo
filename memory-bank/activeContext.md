@@ -34,20 +34,22 @@ Sample task ready: "Change index bg to purple"
 ✅ **Streaming JSON**: Real-time output shows Claude's tool usage and thinking
 ✅ **Docker Security**: Sandboxed execution with proper credential mounting
 
-## Current Blockers
+## Recent Progress
 
-### 🚧 **Docker-in-Docker Problem** (HIGH PRIORITY)
-- Manager runs in Docker container but tries to spawn other agents via `docker run`
-- ERROR: "/bin/sh: docker: not found" - Docker not available inside container
-- This is a fundamental architectural issue requiring design decision
+### ✅ **Shell Environment Fixed** (COMPLETED)
+- Docker container now includes bash installation and proper SHELL environment
+- Manager can successfully use Bash tool for agent spawning
 
-**Possible Solutions:**
-1. **Docker-in-Docker (DinD)**: Install Docker in container + mount socket
-2. **Host-level Agent Spawning**: Manager communicates spawn requests to host  
-3. **All-in-One Container**: Run all agents in same container with process isolation
-4. **Host-based Manager**: Move Manager to host, keep agents in containers
+### ✅ **Docker-in-Docker Problem Resolved** (COMPLETED)
+- **Solution Chosen**: All-in-One Container approach
+- All agents run as Node.js processes within same container (no docker spawning needed)
+- New agent.ts spawns Claude CLI processes directly, not containers
+- This eliminates complexity while maintaining isolation
 
-**Decision Status**: ⏳ Pending architectural decision
+### ✅ **Agent Spawning Working** (COMPLETED)
+- Manager successfully calls `claudo plan/worker/critic/oracle` commands
+- Agent spawn creates temporary prompt files in .claudo/
+- Stream parsing provides readable output from agents
 
 ### 🚧 **Log Parsing & UX** (MEDIUM PRIORITY) 
 - Claude CLI outputs verbose JSON streaming logs that are hard to read

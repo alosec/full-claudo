@@ -37,7 +37,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const child_process_1 = require("child_process");
 const fs_1 = require("fs");
 const path = __importStar(require("path"));
-// Spawn ephemeral Claude agent in Docker
+const parser_1 = require("./parser");
+// Spawn Claude agent as Node.js process within container
 function spawnAgent() {
     const [, , agentType, ...promptArgs] = process.argv;
     if (!agentType || !['plan', 'worker', 'critic', 'oracle'].includes(agentType)) {
@@ -46,22 +47,47 @@ function spawnAgent() {
     }
     // Map 'plan' to 'planner' for consistency
     const promptFile = agentType === 'plan' ? 'planner' : agentType;
-    const basePrompt = (0, fs_1.readFileSync)(`/usr/local/lib/claudo/prompts/${promptFile}.md`, 'utf8');
+    // Look for prompts in container location first, then local
+    let basePrompt;
+    try {
+        basePrompt = (0, fs_1.readFileSync)(`/usr/local/lib/claudo/prompts/${promptFile}.md`, 'utf8');
+    }
+    catch (e) {
+        // Fallback to local prompts directory
+        basePrompt = (0, fs_1.readFileSync)(`./prompts/${promptFile}.md`, 'utf8');
+    }
     const userPrompt = promptArgs.join(' ');
     const fullPrompt = `${basePrompt}\n\nTask: ${userPrompt}`;
     // Ensure .claudo directory exists
     const claudoDir = path.join(process.cwd(), '.claudo');
     (0, fs_1.mkdirSync)(claudoDir, { recursive: true });
-    // Write prompt to temporary file to avoid shell escaping issues
+    // Write prompt to temporary file
     const tempPromptFile = path.join(claudoDir, `${agentType}-prompt.txt`);
-    require('fs').writeFileSync(tempPromptFile, fullPrompt);
-    // Run ephemeral container (no name, auto-remove)
-    const cmd = `docker run --rm \\
-    -v "$(pwd):/workspace" \\
-    -v "$HOME/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro" \\
-    -v "$HOME/.claude/settings.json:/home/node/.claude/settings.json:ro" \\
-    claudo-container \\
-    sh -c 'claude -p "$(cat /workspace/.claudo/${agentType}-prompt.txt)" --dangerously-skip-permissions --output-format stream-json --verbose --model sonnet'`;
-    (0, child_process_1.execSync)(cmd, { stdio: 'inherit', cwd: process.cwd() });
+    (0, fs_1.writeFileSync)(tempPromptFile, fullPrompt);
+    // Determine input format based on stdin
+    const hasInput = !process.stdin.isTTY;
+    const inputFormat = hasInput ? 'stream-json' : 'text';
+    // Spawn Claude process
+    const claude = (0, child_process_1.spawn)('claude', [
+        '-p', `$(cat ${tempPromptFile})`,
+        '--dangerously-skip-permissions',
+        '--output-format', 'stream-json',
+        '--input-format', inputFormat,
+        '--verbose',
+        '--model', 'sonnet'
+    ], {
+        stdio: ['pipe', 'pipe', 'inherit'],
+        shell: true
+    });
+    // Set up stream parsing for human-readable output
+    const parser = new parser_1.ClaudeStreamParser(agentType.charAt(0).toUpperCase() + agentType.slice(1));
+    // Connect streams
+    if (hasInput) {
+        process.stdin.pipe(claude.stdin);
+    }
+    claude.stdout.pipe(parser);
+    claude.on('close', (code) => {
+        process.exit(code || 0);
+    });
 }
 spawnAgent();

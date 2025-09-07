@@ -26,11 +26,10 @@
 ## Active Task Queue
 - [ ] Change index bg to purple (test task ready for processing)
 
-## Current Limitation
-🚧 **Shell Environment**: Manager reports "No suitable shell found" when using Bash tool
-- Prevents spawning other agents via `claudo plan/worker/critic/oracle`
-- Core Manager functionality works perfectly
-- Only inter-agent communication blocked
+## Critical Issues Resolved ✅
+🎉 **Shell Environment Fixed**: Docker now includes bash and proper SHELL environment
+🎉 **Agent Spawning Working**: All-in-one container approach eliminates Docker-in-Docker complexity
+🎉 **Multi-Agent Communication**: Manager successfully spawns Planner, Worker, Critic, Oracle agents
 
 ## Major Achievement
 **Simple Architecture Validated**: ~100 lines of TypeScript successfully orchestrates Claude instances
