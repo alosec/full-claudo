@@ -24,7 +24,16 @@
 - **Authentication**: Claude credentials properly mounted and working
 
 ## Active Task Queue
-- [ ] Change index bg to purple (test task ready for processing)
+- ✅ Add --version flag to claudo command (completed successfully)
+
+## Recent Task Completion
+**Task**: Add --version flag to claudo command
+**Status**: ✅ COMPLETED
+**Implementation**: 
+- Added --version and -v flag support to claudo bash script
+- Flags extract version from package.json (currently 1.0.0)
+- Updated usage message and README documentation
+- All existing functionality preserved and tested
 
 ## Critical Issues Resolved ✅
 🎉 **Shell Environment Fixed**: Docker now includes bash and proper SHELL environment

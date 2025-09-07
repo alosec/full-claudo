@@ -33,6 +33,12 @@ docker build -t claudo-container ./docker
 3. Manager will read tasks and spawn other agents as needed
 4. All work is saved to git automatically
 
+### Commands
+
+- `./claudo up` - Start the Manager
+- `./claudo down` - Stop the Manager
+- `./claudo --version` or `./claudo -v` - Show version information
+
 ## Task Queue Format
 
 Simple text file with one task per line:

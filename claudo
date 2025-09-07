@@ -1,9 +1,23 @@
 #!/bin/bash
 
 # Full Claudo - Simple Multi-Agent Claude System
-# Usage: claudo up|down|plan|worker|critic|oracle
+# Usage: claudo up|down|plan|worker|critic|oracle|--version|-v
 
 CLAUDO_LIB="/usr/local/lib/claudo"
+
+# Handle version flag
+if [[ "$1" == "--version" || "$1" == "-v" ]]; then
+  # Extract version from package.json
+  if [[ -f "/usr/local/lib/claudo/package.json" ]]; then
+    VERSION=$(node -p "require('/usr/local/lib/claudo/package.json').version")
+  elif [[ -f "package.json" ]]; then
+    VERSION=$(node -p "require('./package.json').version")  
+  else
+    VERSION="unknown"
+  fi
+  echo "claudo version $VERSION"
+  exit 0
+fi
 
 case "$1" in
   up)
@@ -18,7 +32,7 @@ case "$1" in
     node "$CLAUDO_LIB/dist/agent.js" "$@"
     ;;
   *)
-    echo "Usage: claudo {up|down|plan|worker|critic|oracle} [args...]"
+    echo "Usage: claudo {up|down|plan|worker|critic|oracle|--version|-v} [args...]"
     exit 1
     ;;
 esac
