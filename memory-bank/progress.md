@@ -40,20 +40,31 @@
 🎉 **Agent Spawning Working**: All-in-one container approach eliminates Docker-in-Docker complexity
 🎉 **Multi-Agent Communication**: Manager successfully spawns Planner, Worker, Critic, Oracle agents
 
+## Recent Enhancement: Stream Parser UX Improvement ✅
+**Completed**: Enhanced ClaudeStreamParser for better readability
+**Changes**:
+- Added color-coded output with ANSI escape sequences
+- Tool parameters extracted and displayed (e.g., shows actual bash commands)
+- Abbreviated tool outputs (first 3 lines with line count)
+- Execution timing for each tool operation
+- Better spacing and formatting for readability
+
+**Result**: Transformed verbose JSON into clean, readable status updates
+
 ## Major Achievement
 **Simple Architecture Validated**: ~100 lines of TypeScript successfully orchestrates Claude instances
 - No complex MCP servers needed ✅
 - No complex state machines needed ✅  
 - File-based prompts work ✅
 - Docker security works ✅
-- Streaming JSON visibility works ✅
+- Enhanced streaming parser works ✅
 - Memory-bank integration works ✅
 
 ## Next Phase
-1. **Shell Environment Fix**: Configure proper POSIX shell in Docker container
-2. **Agent Spawning Test**: Manager → Planner workflow validation  
-3. **Full Pipeline**: Manager → Planner → Worker → Critic workflow
-4. **Task Completion**: Process test task end-to-end with git commit
+1. **Full System Test**: Run Manager with real tasks from queue
+2. **Agent Communication Test**: Manager → Planner → Worker → Critic flow
+3. **Output Validation**: Ensure all agents produce readable output
+4. **Documentation**: Update README with latest features
 
 ## Key Innovation Proven
-The vision works: A Manager Claude can orchestrate other Claude instances through simple process spawning, replacing complex multi-agent frameworks with elegant simplicity.
+The vision works: A Manager Claude can orchestrate other Claude instances through simple process spawning, with clean readable output, replacing complex multi-agent frameworks with elegant simplicity.
