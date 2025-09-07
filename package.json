@@ -1,0 +1,18 @@
+{
+  "name": "full-claudo",
+  "version": "1.0.0",
+  "description": "Simple multi-agent Claude system",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && ./claudo up",
+    "stop": "./claudo down"
+  },
+  "keywords": ["claude", "multi-agent", "automation"],
+  "author": "Alex",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

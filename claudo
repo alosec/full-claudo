@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Full Claudo - Simple Multi-Agent Claude System
+# Usage: claudo up|down|plan|worker|critic|oracle
+
+CLAUDO_LIB="/usr/local/lib/claudo"
+
+case "$1" in
+  up)
+    echo "[claudo] Starting Manager..."
+    node "$CLAUDO_LIB/dist/up.js"
+    ;;
+  down)
+    echo "[claudo] Stopping Manager..."
+    node "$CLAUDO_LIB/dist/down.js"
+    ;;
+  plan|worker|critic|oracle)
+    node "$CLAUDO_LIB/dist/agent.js" "$@"
+    ;;
+  *)
+    echo "Usage: claudo {up|down|plan|worker|critic|oracle} [args...]"
+    exit 1
+    ;;
+esac
