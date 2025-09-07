@@ -1,0 +1,26 @@
+task: "Add --version flag to claudo command"  
+priority: low
+estimated_effort: "15 minutes"
+dependencies: ["package.json version field", "claudo bash script"]
+
+analysis:
+  current_state: "claudo script accepts up|down|plan|worker|critic|oracle commands only"
+  requirements: "Add --version and -v flags that display version from package.json" 
+  approach: "Modify claudo bash script to handle version flags before case statement"
+
+implementation_steps:
+  - step: "Add version flag handling to claudo script"
+    files: ["claudo"]
+    type: "modify"
+    description: "Add --version/-v flag parsing and version display logic"
+
+testing_strategy:
+  - "Test ./claudo --version shows correct version"
+  - "Test ./claudo -v shows correct version"  
+  - "Test existing commands still work (up, down, plan, etc)"
+
+completion_criteria:
+  - "claudo --version displays version 1.0.0 from package.json"
+  - "claudo -v displays same version information"
+  - "All existing commands continue to function normally"
+  - "Usage message updated to show version option"

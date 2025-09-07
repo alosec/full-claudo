@@ -20,6 +20,16 @@ function runManager() {
   const claudoDir = path.join(process.cwd(), '.claudo');
   mkdirSync(claudoDir, { recursive: true });
   
+  // Ensure planning directories exist
+  const planningDir = path.join(process.cwd(), 'planning');
+  const tasksDir = path.join(planningDir, 'tasks');
+  const featuresDir = path.join(planningDir, 'features');
+  const workLogDir = path.join(process.cwd(), 'work-log');
+  
+  mkdirSync(tasksDir, { recursive: true });
+  mkdirSync(featuresDir, { recursive: true });
+  mkdirSync(workLogDir, { recursive: true });
+  
   // Write prompt to temporary file
   const tempPromptFile = path.join(claudoDir, 'manager-prompt.txt');
   writeFileSync(tempPromptFile, managerPrompt);
