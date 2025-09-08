@@ -1,57 +1,39 @@
 #!/usr/bin/env node
 
 import { Transform } from 'stream';
+import { appendFileSync } from 'fs';
 
-// Complete Claude streaming JSON message types
+interface ToolUseContent {
+  type: 'tool_use';
+  id: string;
+  name: string;
+  input: any;
+}
+
+interface TextContent {
+  type: 'text';
+  text: string;
+}
+
+interface ToolResultContent {
+  type: 'tool_result';
+  tool_use_id: string;
+  content: string;
+  is_error?: boolean;
+}
+
 interface AssistantMessage {
   type: 'assistant';
   message?: {
-    id: string;
-    type: 'message';
-    role: 'assistant';
-    model: string;
-    content: Array<{
-      type: 'text' | 'tool_use';
-      text?: string;
-      id?: string;
-      name?: string;
-      input?: {
-        command?: string;
-        description?: string;
-        file_path?: string;
-        old_string?: string;
-        new_string?: string;
-        [key: string]: any;
-      };
-    }>;
-    stop_reason?: string | null;
-    stop_sequence?: string | null;
-    usage?: {
-      input_tokens: number;
-      output_tokens: number;
-      cache_creation_input_tokens?: number;
-      cache_read_input_tokens?: number;
-    };
+    content: Array<TextContent | ToolUseContent>;
   };
-  parent_tool_use_id?: string | null;
-  session_id?: string;
-  uuid?: string;
 }
 
 interface UserMessage {
   type: 'user';
   message?: {
-    role: 'user';
-    content: Array<{
-      type: 'tool_result';
-      tool_use_id: string;
-      content: string;
-      is_error?: boolean;
-    }>;
+    content: Array<ToolResultContent>;
   };
-  parent_tool_use_id?: string | null;
-  session_id?: string;
-  uuid?: string;
 }
 
 type StreamMessage = AssistantMessage | UserMessage;
@@ -59,10 +41,7 @@ type StreamMessage = AssistantMessage | UserMessage;
 export interface ParserOptions {
   agentName?: string;
   useColors?: boolean;
-  verboseErrors?: boolean;
-  fallbackToRaw?: boolean;
-  maxOutputLength?: number;
-  enableHeartbeat?: boolean;
+  outputFile?: string;
 }
 
 export class ClaudeStreamParser extends Transform {
@@ -71,83 +50,39 @@ export class ClaudeStreamParser extends Transform {
   private pendingTools: Map<string, { name: string; input: any; startTime: number }> = new Map();
   private useColors: boolean;
   private lastWasToolResult: boolean = false;
-  private verboseErrors: boolean;
-  private fallbackToRaw: boolean;
-  private maxOutputLength: number;
-  private errorCount: number = 0;
-  private lineCount: number = 0;
-  private successCount: number = 0;
-  private lastOutputTime: number = Date.now();
-  private enableHeartbeat: boolean;
-  private heartbeatInterval: NodeJS.Timeout | null = null;
-  private outputHealthy: boolean = true;
+  private outputFile?: string;
 
-  constructor(agentName: string | ParserOptions = 'Agent', useColors?: boolean) {
-    super({ objectMode: false });
+  constructor(options: string | ParserOptions = 'Agent', useColors: boolean = true) {
+    super({ objectMode: true });
     
-    // Handle both old and new constructor signatures
-    if (typeof agentName === 'string') {
-      this.agentName = agentName;
-      this.useColors = (useColors !== false) && process.stdout.isTTY;
-      this.verboseErrors = false;
-      this.fallbackToRaw = true;
-      this.maxOutputLength = 1000;
-      this.enableHeartbeat = true;
+    // Handle both old string-based constructor and new options object
+    if (typeof options === 'string') {
+      this.agentName = options;
+      this.useColors = useColors && process.stdout.isTTY;
+      this.outputFile = undefined;
     } else {
-      const options = agentName;
       this.agentName = options.agentName || 'Agent';
       this.useColors = (options.useColors !== false) && process.stdout.isTTY;
-      this.verboseErrors = options.verboseErrors || false;
-      this.fallbackToRaw = options.fallbackToRaw !== false;
-      this.maxOutputLength = options.maxOutputLength || 1000;
-      this.enableHeartbeat = options.enableHeartbeat !== false;
-    }
-
-    // Start heartbeat monitoring to detect console.log failures
-    if (this.enableHeartbeat) {
-      this.startHeartbeat();
+      this.outputFile = options.outputFile;
     }
   }
-
-  private startHeartbeat() {
-    this.heartbeatInterval = setInterval(() => {
-      const timeSinceLastOutput = Date.now() - this.lastOutputTime;
-      
-      // If no output for more than 2 seconds, try to force output
-      if (timeSinceLastOutput > 2000 && this.outputHealthy) {
-        this.outputHealthy = false;
-        
-        // Try multiple output methods
-        this.forceOutput(`[${this.agentName}] ⚠️ Output may be delayed (${(timeSinceLastOutput/1000).toFixed(1)}s since last output)`);
-        
-        // Force flush stdout
-        if (process.stdout.write('')) {
-          process.stdout.emit('drain');
-        }
-      } else if (timeSinceLastOutput < 1000) {
-        this.outputHealthy = true;
-      }
-    }, 500);
+  
+  private output(text: string) {
+    if (this.outputFile) {
+      // Write to file instead of console
+      appendFileSync(this.outputFile, text + '\n');
+    } else {
+      // Write to console
+      console.log(text);
+    }
   }
-
-  private forceOutput(message: string) {
-    // Try multiple methods to output
-    try {
-      // Method 1: Regular console.log
-      console.log(message);
-      
-      // Method 2: Direct stdout write
-      process.stdout.write(message + '\n');
-      
-      // Method 3: stderr as fallback
-      if (!this.outputHealthy) {
-        process.stderr.write(`[FALLBACK] ${message}\n`);
-      }
-      
-      this.lastOutputTime = Date.now();
-    } catch (e) {
-      // Last resort: stderr
-      process.stderr.write(`[ERROR] Failed to output: ${e}\n`);
+  
+  private outputError(text: string) {
+    if (this.outputFile) {
+      // Write errors to file too
+      appendFileSync(this.outputFile, text + '\n');
+    } else {
+      console.error(text);
     }
   }
 
@@ -159,164 +94,72 @@ export class ClaudeStreamParser extends Transform {
       this.buffer = lines.pop() || ''; // Keep incomplete line in buffer
       
       for (const line of lines) {
-        this.lineCount++;
         if (line.trim()) {
-          this.processLine(line);
+          try {
+            const message: StreamMessage = JSON.parse(line);
+            this.processMessage(message);
+          } catch (e) {
+            // Log JSON parsing errors for debugging with fallback display
+            this.outputError(`[${this.agentName}] JSON parse error: ${e instanceof Error ? e.message : e}`);
+            this.outputError(`[${this.agentName}] Problematic line: ${line.substring(0, 200)}`);
+            
+            // Fallback: show raw content if it looks like meaningful output
+            if (line.length > 10 && !line.startsWith('{')) {
+              this.output(`[${this.agentName}] Raw: ${line}`);
+            }
+          }
         }
       }
       
-      // Don't pass through data - we're a terminal consumer
+      // Pass through original data for any downstream consumers
+      this.push(chunk);
       callback();
-    } catch (error) {
-      this.handleError('_transform', error);
-      callback();
-    }
-  }
-
-  _flush(callback: Function) {
-    try {
-      // Process any remaining buffer content
-      if (this.buffer.trim()) {
-        this.processLine(this.buffer);
-      }
-      
-      // Clean up heartbeat
-      if (this.heartbeatInterval) {
-        clearInterval(this.heartbeatInterval);
-      }
-      
-      // Output final statistics if verbose
-      if (this.verboseErrors && (this.errorCount > 0 || this.lineCount > 100)) {
-        this.forceOutput(`[${this.agentName}] Parser Statistics: lines=${this.lineCount}, success=${this.successCount}, errors=${this.errorCount}`);
-      }
-      
-      callback();
-    } catch (error) {
-      this.handleError('_flush', error);
-      callback();
-    }
-  }
-
-  private processLine(line: string) {
-    try {
-      const message: StreamMessage = JSON.parse(line);
-      this.processMessage(message);
-      this.successCount++;
-    } catch (parseError) {
-      this.errorCount++;
-      
-      if (this.verboseErrors) {
-        this.forceOutput(`[${this.agentName}] JSON parse error at line ${this.lineCount}: ${parseError}`);
-      }
-      
-      // Fallback to raw output if enabled
-      if (this.fallbackToRaw) {
-        this.outputRawLine(line);
-      }
-    }
-  }
-
-  private outputRawLine(line: string) {
-    try {
-      const prefix = `[${this.formatColor(this.agentName, 'bright')}]`;
-      
-      if (line.includes('"type":"text"')) {
-        const textMatch = line.match(/"text"\s*:\s*"([^"]*)/);
-        if (textMatch) {
-          this.safeOutput(`${prefix} ${this.formatColor('[RAW TEXT]', 'yellow')} ${textMatch[1]}`);
-          return;
-        }
-      }
-      
-      if (line.includes('"type":"tool_use"')) {
-        const toolMatch = line.match(/"name"\s*:\s*"([^"]*)/);
-        if (toolMatch) {
-          this.safeOutput(`${prefix} ${this.formatColor('[RAW TOOL]', 'yellow')} ${toolMatch[1]}`);
-          return;
-        }
-      }
-      
-      const truncated = line.length > 100 ? line.substring(0, 100) + '...' : line;
-      this.safeOutput(`${prefix} ${this.formatColor('[RAW]', 'red')} ${truncated}`);
     } catch (e) {
-      if (this.verboseErrors) {
-        this.forceOutput(`[${this.agentName}] Failed to output raw line: ${e}`);
-      }
-    }
-  }
-
-  private safeOutput(text: string) {
-    try {
-      console.log(text);
-      this.lastOutputTime = Date.now();
-      this.outputHealthy = true;
-    } catch (e) {
-      this.forceOutput(text);
+      // Catch any errors in the entire transform process
+      this.outputError(`[${this.agentName}] Transform error: ${e instanceof Error ? e.message : e}`);
+      this.outputError(`[${this.agentName}] Chunk: ${chunk.toString().substring(0, 100)}`);
+      
+      // Still pass through the chunk and continue processing
+      this.push(chunk);
+      callback();
     }
   }
 
   private formatColor(text: string, color: string): string {
     if (!this.useColors) return text;
     const colors: { [key: string]: string } = {
-      reset: '\x1b[0m',
-      bright: '\x1b[1m',
-      dim: '\x1b[2m',
-      red: '\x1b[31m',
-      green: '\x1b[32m',
-      yellow: '\x1b[33m',
-      blue: '\x1b[34m',
-      cyan: '\x1b[36m',
-      gray: '\x1b[90m'
+      'bright': '\x1b[1m',
+      'cyan': '\x1b[36m',
+      'yellow': '\x1b[33m',
+      'green': '\x1b[32m',
+      'red': '\x1b[31m',
+      'gray': '\x1b[90m',
+      'dim': '\x1b[2m',
+      'reset': '\x1b[0m'
     };
-    return `${colors[color] || ''}${text}${colors.reset || ''}`;
-  }
-
-  private formatTimestamp(): string {
-    const now = new Date();
-    const time = now.toTimeString().split(' ')[0];
-    return this.formatColor(time, 'gray');
+    return `${colors[color] || ''}${text}\x1b[0m`;
   }
 
   private truncateOutput(text: string, maxLines: number = 3): string {
-    try {
-      const safeText = String(text || '');
-      const lines = safeText.split('\n');
-      
-      if (lines.length <= maxLines) return safeText;
-      
-      return lines.slice(0, maxLines).join('\n') + 
-             this.formatColor(`\n... (${lines.length - maxLines} more lines)`, 'dim');
-    } catch (e) {
-      return this.formatColor('[truncation failed]', 'red');
-    }
+    const lines = text.split('\n');
+    if (lines.length <= maxLines) return text;
+    return lines.slice(0, maxLines).join('\n') + 
+           this.formatColor(`\n... (${lines.length - maxLines} more lines)`, 'dim');
   }
 
   private formatToolInput(name: string, input: any): string {
-    try {
-      if (!input) return `${name}: [no input]`;
-      
-      switch (name) {
-        case 'Bash':
-          return input.command ? `$ ${String(input.command).substring(0, 100)}` : 'Running command...';
-        case 'Read':
-          return input.file_path ? `Reading ${String(input.file_path)}` : 'Reading file...';
-        case 'Edit':
-        case 'Write':
-          return input.file_path ? `Editing ${String(input.file_path)}` : 'Editing file...';
-        case 'Grep':
-          return input.pattern ? `Searching for: ${String(input.pattern).substring(0, 50)}` : 'Searching...';
-        case 'Glob':
-          return JSON.stringify(input).substring(0, 100);
-        default:
-          try {
-            const str = JSON.stringify(input);
-            return str.substring(0, 100);
-          } catch {
-            return '[complex object]';
-          }
-      }
-    } catch (e) {
-      return `${name}: [format error]`;
+    switch (name) {
+      case 'Bash':
+        return input.command ? `$ ${input.command}` : 'Running command...';
+      case 'Read':
+        return input.file_path ? `Reading ${input.file_path}` : 'Reading file...';
+      case 'Edit':
+      case 'Write':
+        return input.file_path ? `Editing ${input.file_path}` : 'Editing file...';
+      case 'Grep':
+        return input.pattern ? `Searching for: ${input.pattern}` : 'Searching...';
+      default:
+        return JSON.stringify(input).substring(0, 100);
     }
   }
 
@@ -325,179 +168,70 @@ export class ClaudeStreamParser extends Transform {
       const prefix = `[${this.formatColor(this.agentName, 'bright')}]`;
       
       if (message.type === 'assistant' && message.message?.content) {
-        this.processAssistantMessage(prefix, message.message.content);
-      } else if (message.type === 'user' && message.message?.content) {
-        this.processUserMessage(prefix, message.message.content);
-      } else if (this.verboseErrors) {
-        this.safeOutput(`${prefix} ${this.formatColor('[Unknown message type]', 'yellow')} ${message.type}`);
-      }
-    } catch (error) {
-      this.handleError('processMessage', error, message);
-    }
-  }
-
-  private processAssistantMessage(prefix: string, content: any[]) {
-    try {
-      if (!Array.isArray(content)) {
-        if (this.verboseErrors) {
-          this.forceOutput(`${prefix} Warning: content is not an array`);
-        }
-        return;
-      }
-
-      for (const item of content) {
-        try {
-          if (item.type === 'text' && item.text) {
+        for (const content of message.message.content) {
+          if (content.type === 'text' && content.text) {
+            // Add spacing after tool results
             if (this.lastWasToolResult) {
-              this.safeOutput('');
+              this.output('');
               this.lastWasToolResult = false;
             }
+            this.output(`${prefix} ${content.text}`);
+          } else if (content.type === 'tool_use' && content.id) {
+            const toolName = content.name || 'Unknown';
+            const toolInfo = this.formatToolInput(toolName, content.input || {});
+            this.output(`${prefix} ${this.formatColor('→', 'cyan')} ${this.formatColor(toolName, 'yellow')}: ${toolInfo}`);
             
-            const safeText = String(item.text || '').substring(0, this.maxOutputLength);
-            this.safeOutput(`${prefix} ${safeText}`);
-          } else if (item.type === 'tool_use' && item.id) {
-            const toolName = item.name || 'Unknown';
-            const toolInfo = this.formatToolInput(toolName, item.input || {});
-            this.safeOutput(`${prefix} ${this.formatColor('→', 'cyan')} ${this.formatColor(toolName, 'yellow')}: ${toolInfo}`);
-            
-            this.pendingTools.set(item.id, {
+            // Store tool info for matching with results
+            this.pendingTools.set(content.id, {
               name: toolName,
-              input: item.input,
+              input: content.input,
               startTime: Date.now()
             });
           }
-        } catch (itemError) {
-          if (this.verboseErrors) {
-            this.forceOutput(`${prefix} Error processing content item: ${itemError}`);
-          }
         }
-      }
-    } catch (error) {
-      this.handleError('processAssistantMessage', error);
-    }
-  }
-
-  private processUserMessage(prefix: string, content: any[]) {
-    try {
-      if (!Array.isArray(content)) {
-        if (this.verboseErrors) {
-          this.forceOutput(`${prefix} Warning: content is not an array`);
-        }
-        return;
-      }
-
-      for (const item of content) {
-        try {
-          if (item.type === 'tool_result') {
-            const toolInfo = this.pendingTools.get(item.tool_use_id);
+      } else if (message.type === 'user' && message.message?.content) {
+        for (const content of message.message.content) {
+          if (content.type === 'tool_result') {
+            const toolInfo = this.pendingTools.get(content.tool_use_id);
             const elapsed = toolInfo ? ((Date.now() - toolInfo.startTime) / 1000).toFixed(1) : null;
             const timeStr = elapsed ? ` ${this.formatColor(`(${elapsed}s)`, 'gray')}` : '';
             
-            if (item.is_error) {
-              this.safeOutput(`${prefix} ${this.formatColor('✗', 'red')} Tool failed${timeStr}`);
-              const errorPreview = this.truncateOutput(item.content, 2);
+            if (content.is_error) {
+              this.output(`${prefix} ${this.formatColor('✗', 'red')} Tool failed${timeStr}`);
+              const errorPreview = this.truncateOutput(content.content, 2);
               if (errorPreview) {
-                this.safeOutput(this.formatColor(`   ${errorPreview.replace(/\n/g, '\n   ')}`, 'red'));
+                this.output(this.formatColor(`   ${errorPreview.replace(/\n/g, '\n   ')}`, 'red'));
               }
             } else {
-              this.safeOutput(`${prefix} ${this.formatColor('✓', 'green')} Completed${timeStr}`);
+              this.output(`${prefix} ${this.formatColor('✓', 'green')} Completed${timeStr}`);
               
-              if (toolInfo && ['Bash', 'Grep'].includes(toolInfo.name) && item.content) {
-                const preview = this.truncateOutput(item.content, 3);
+              // Show abbreviated output for certain tools
+              if (toolInfo && ['Bash', 'Grep'].includes(toolInfo.name) && content.content) {
+                const preview = this.truncateOutput(content.content, 3);
                 if (preview && preview.trim()) {
-                  this.safeOutput(this.formatColor(`   ${preview.replace(/\n/g, '\n   ')}`, 'dim'));
+                  this.output(this.formatColor(`   ${preview.replace(/\n/g, '\n   ')}`, 'dim'));
                 }
               }
             }
             
             this.lastWasToolResult = true;
-            this.pendingTools.delete(item.tool_use_id);
-          }
-        } catch (itemError) {
-          if (this.verboseErrors) {
-            this.forceOutput(`${prefix} Error processing tool result: ${itemError}`);
+            this.pendingTools.delete(content.tool_use_id);
           }
         }
       }
-    } catch (error) {
-      this.handleError('processUserMessage', error);
+    } catch (e) {
+      this.outputError(`[${this.agentName}] Error processing message: ${e instanceof Error ? e.message : e}`);
+      this.outputError(`[${this.agentName}] Message: ${JSON.stringify(message).substring(0, 300)}`);
     }
-  }
-
-  private handleError(context: string, error: any, data?: any) {
-    this.errorCount++;
-    
-    if (this.verboseErrors) {
-      this.forceOutput(`[${this.agentName}] Error in ${context}: ${error instanceof Error ? error.message : error}`);
-      
-      if (data) {
-        this.forceOutput(`[${this.agentName}] Related data: ${JSON.stringify(data).substring(0, 300)}`);
-      }
-    }
-    
-    this.emit('parser-error', { context, error, data });
-  }
-
-  public getStatistics() {
-    return {
-      lines: this.lineCount,
-      success: this.successCount,
-      errors: this.errorCount,
-      errorRate: this.lineCount > 0 ? (this.errorCount / this.lineCount) * 100 : 0,
-      pendingTools: this.pendingTools.size,
-      outputHealthy: this.outputHealthy
-    };
-  }
-
-  public destroy(error?: Error) {
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
-    }
-    super.destroy(error);
-    return this;
   }
 }
 
-// CLI usage
+// CLI usage: node parser.js [agent-name]
 if (require.main === module) {
-  const args = process.argv.slice(2);
-  const agentName = args[0] || 'Agent';
+  const agentName = process.argv[2] || 'Agent';
+  const parser = new ClaudeStreamParser(agentName);
   
-  const options: ParserOptions = {
-    agentName,
-    verboseErrors: args.includes('--verbose') || args.includes('-v'),
-    fallbackToRaw: !args.includes('--no-fallback'),
-    useColors: !args.includes('--no-color'),
-    enableHeartbeat: !args.includes('--no-heartbeat')
-  };
-  
-  if (args.includes('--help') || args.includes('-h')) {
-    console.log(`
-Usage: node parser.js [agent-name] [options]
-
-Options:
-  --verbose, -v     Show detailed error information
-  --no-fallback     Disable fallback to raw output on parse errors
-  --no-color        Disable colored output
-  --no-heartbeat    Disable heartbeat monitoring
-  --help, -h        Show this help message
-
-The parser reads JSON stream from stdin and outputs formatted messages to stdout.
-`);
-    process.exit(0);
-  }
-  
-  const parser = new ClaudeStreamParser(options);
-  
-  process.on('SIGINT', () => {
-    const stats = parser.getStatistics();
-    console.error(`\n[${agentName}] Interrupted. Statistics:`, stats);
-    parser.destroy();
-    process.exit(0);
-  });
-  
-  process.stdin.pipe(parser);
+  process.stdin.pipe(parser).pipe(process.stdout);
 }
 
 export default ClaudeStreamParser;

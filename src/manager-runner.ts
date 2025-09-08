@@ -3,13 +3,17 @@
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, mkdirSync, createWriteStream } from 'fs';
 import * as path from 'path';
-import { BulletproofParser } from './parser-v2';
+import { ClaudeStreamParser, ParserOptions } from './parser';
 
 // Run Manager Claude within container with streaming output
 function runManager() {
   const workDir = '/workspace';
   const claudoDir = path.join(workDir, '.claudo');
-  const managerSystemPrompt = path.join(workDir, 'prompts', 'manager-system.md');
+  const managerSystemPrompt = path.join(workDir, 'prompts', 'manager.md');
+  
+  // Check if we're in file output mode (passed as CLI argument)
+  const useFileOutput = process.argv.includes('--output-file');
+  const outputFile = useFileOutput ? path.join(claudoDir, 'manager-output.log') : undefined;
   
   // Ensure .claudo directory exists
   try {
@@ -43,13 +47,20 @@ function runManager() {
     }
   });
   
-  // Set up stream parsing with bulletproof output
-  const parser = new BulletproofParser({
+  // Set up stream parsing with appropriate output mode
+  const parserOptions: ParserOptions = {
     agentName: 'Manager',
-    verboseErrors: true,
-    fallbackToRaw: true,
-    useColors: true
-  });
+    useColors: !useFileOutput,  // Disable colors when writing to file
+    outputFile: outputFile
+  };
+  
+  const parser = new ClaudeStreamParser(parserOptions);
+  
+  if (useFileOutput && outputFile) {
+    console.log(`[claudo] Parser output will be written to: ${outputFile}`);
+    // Clear the output file at start
+    writeFileSync(outputFile, '');
+  }
   
   // Set up debug logging to capture raw JSON
   const debugLogPath = path.join(claudoDir, 'manager-debug.jsonl');
@@ -90,8 +101,6 @@ function runManager() {
   // Handle container termination
   process.on('SIGINT', () => {
     console.log('[claudo] Stopping Manager...');
-    const stats = parser.getStatistics();
-    console.log('[claudo] Parser statistics:', stats);
     manager.kill('SIGTERM');
     setTimeout(() => {
       manager.kill('SIGKILL');

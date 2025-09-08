@@ -2,9 +2,9 @@
   "name": "full-claudo",
   "version": "1.0.0",
   "description": "Simple multi-agent Claude system",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "bin": {
-    "claudo": "./dist/cli.js"
+    "claudo": "./dist/src/cli.js"
   },
   "scripts": {
     "build": "tsc",

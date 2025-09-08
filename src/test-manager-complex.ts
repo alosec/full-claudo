@@ -141,12 +141,7 @@ This simulates the real manager flow that causes hanging.`;
   // Set up parser
   let parser: ClaudeStreamParser | null = null;
   if (!noParser) {
-    parser = new ClaudeStreamParser({
-      agentName: 'ComplexTest',
-      verboseErrors: useImprovedParser || true,
-      fallbackToRaw: true,
-      enableHeartbeat: true
-    });
+    parser = new ClaudeStreamParser('ComplexTest', true);
     
     // Track parser errors
     parser?.on('error', (error) => {
