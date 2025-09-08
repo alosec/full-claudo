@@ -1,0 +1,47 @@
+# Git
+.git
+.gitignore
+
+# Node modules (will be installed fresh in container)
+node_modules
+.npm
+
+# Build outputs (will be built fresh in container)
+dist
+
+# Local development files
+.claudo
+.env
+.env.local
+*.log
+
+# Editor directories
+.vscode
+.idea
+
+# Documentation
+*.md
+LICENSE
+
+# Test files
+test
+tests
+*.test.ts
+*.test.js
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# macOS
+.DS_Store
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# Work directories
+planning
+work-log
+memory-bank

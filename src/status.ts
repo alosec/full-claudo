@@ -3,6 +3,8 @@
 import { exec } from 'child_process';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
+import { DockerManager } from './docker-manager';
+import { getContainerStatus, getImageSize } from './utils/docker-utils';
 
 interface StatusInfo {
   managerRunning: boolean;
@@ -76,12 +78,16 @@ function getActiveTasks(): string[] {
 export async function showStatus(): Promise<void> {
   console.log('🤖 Full Claudo Status\n');
   
+  // Check Docker image status
+  const dockerManager = new DockerManager();
+  console.log('🐳 ' + dockerManager.getStatus().replace(/\n/g, '\n   '));
+  
   // Check manager status
   const managerRunning = await checkManagerStatus();
   const statusIcon = managerRunning ? '✅' : '❌';
   const statusText = managerRunning ? 'Running' : 'Stopped';
   
-  console.log(`${statusIcon} Manager: ${statusText}`);
+  console.log(`\n${statusIcon} Manager: ${statusText}`);
   
   if (!managerRunning) {
     console.log('   ↳ Run `claudo up` to start the manager');

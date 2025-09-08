@@ -2,6 +2,8 @@
 
 import { spawn } from 'child_process';
 import { join } from 'path';
+import { DockerManager } from './docker-manager';
+import { ensureDockerAvailable } from './utils/docker-utils';
 
 const command = process.argv[2];
 const args = process.argv.slice(3);
@@ -17,6 +19,27 @@ switch (command) {
   case 'down':
     console.log('[claudo] Stopping Manager...');
     require(scriptPath('down'));
+    break;
+
+  case 'build':
+    if (!ensureDockerAvailable()) {
+      process.exit(1);
+    }
+    const dockerManager = new DockerManager();
+    dockerManager.buildImage(true).then(success => {
+      process.exit(success ? 0 : 1);
+    });
+    break;
+
+  case 'rebuild':
+    if (!ensureDockerAvailable()) {
+      process.exit(1);
+    }
+    const dockerMgr = new DockerManager();
+    console.log('[claudo] Force rebuilding Docker image...');
+    dockerMgr.buildImage(true).then(success => {
+      process.exit(success ? 0 : 1);
+    });
     break;
 
   case 'logs':
@@ -62,8 +85,10 @@ Full Claudo - Simple Multi-Agent Claude System
 Usage: claudo <command> [options]
 
 Commands:
-  up           Start the Manager container
+  up           Start the Manager container (auto-builds if needed)
   down         Stop the Manager container
+  build        Build the Docker image if missing
+  rebuild      Force rebuild the Docker image
   status       Show system status and recent activity
   logs         View Manager logs (use -f to follow)
   plan         Run the planning agent
@@ -76,7 +101,8 @@ Options:
   --help       Show this help message
 
 Examples:
-  claudo up              # Start the manager
+  claudo up              # Start the manager (auto-builds if needed)
+  claudo build           # Build Docker image
   claudo logs -f         # Follow manager logs
   claudo plan "task"     # Run planning agent with task
   claudo down            # Stop the manager

@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Read(//home/alex/.claude/agents/**)",
-      "WebFetch(domain:alexgarcia.blog)"
+      "WebFetch(domain:alexgarcia.blog)",
+      "Bash(docker:*)"
     ],
     "deny": [],
     "ask": []

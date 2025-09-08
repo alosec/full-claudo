@@ -4,27 +4,38 @@ import { execSync, spawn } from 'child_process';
 import { mkdirSync } from 'fs';
 import * as path from 'path';
 import { HostDockerParser } from './host-parser';
+import { DockerManager } from './docker-manager';
+import { ensureDockerAvailable, getContainerStatus, removeContainer } from './utils/docker-utils';
 
-// Spawn Manager Claude in Docker container - simplified approach
-function spawnManager() {
+// Spawn Manager Claude in Docker container - with auto-build support
+async function spawnManager() {
   const containerName = 'claudo-manager';
   
+  // Ensure Docker is available
+  if (!ensureDockerAvailable()) {
+    process.exit(1);
+  }
+
+  // Initialize Docker manager
+  const dockerManager = new DockerManager();
+  
+  // Ensure Docker image exists (auto-build if missing)
+  const imageReady = await dockerManager.ensureImage(true);
+  if (!imageReady) {
+    console.error('[claudo] Failed to prepare Docker image.');
+    process.exit(1);
+  }
+  
   // Check if container exists and handle appropriately
-  try {
-    const containerStatus = execSync(`docker inspect -f '{{.State.Status}}' ${containerName} 2>/dev/null`, { 
-      encoding: 'utf-8' 
-    }).trim();
-    
-    if (containerStatus === 'running') {
-      console.log(`[claudo] Manager is already running in container '${containerName}'.`);
-      console.log('[claudo] Use "claudo down" to stop it first, or "claudo logs" to view output.');
-      return;
-    } else if (containerStatus === 'exited' || containerStatus === 'created') {
-      console.log(`[claudo] Removing stopped container '${containerName}'...`);
-      execSync(`docker rm ${containerName}`, { stdio: 'ignore' });
-    }
-  } catch (e) {
-    // Container doesn't exist, which is fine
+  const containerStatus = getContainerStatus(containerName);
+  
+  if (containerStatus === 'running') {
+    console.log(`[claudo] Manager is already running in container '${containerName}'.`);
+    console.log('[claudo] Use "claudo down" to stop it first, or "claudo logs" to view output.');
+    return;
+  } else if (containerStatus === 'exited' || containerStatus === 'created') {
+    console.log(`[claudo] Removing stopped container '${containerName}'...`);
+    removeContainer(containerName);
   }
   
   // Ensure .claudo directory exists
@@ -59,13 +70,7 @@ function spawnManager() {
     }, 2000);
     
   } catch (error: any) {
-    if (error.message.includes('Unable to find image')) {
-      console.error('[claudo] Error: Docker image "claudo-container" not found.');
-      console.error('[claudo] Please build the image first with:');
-      console.error('  cd /path/to/full-claudo && docker build -t claudo-container docker/');
-    } else {
-      console.error('[claudo] Error starting manager:', error.message);
-    }
+    console.error('[claudo] Error starting manager:', error.message);
     process.exit(1);
   }
 }
