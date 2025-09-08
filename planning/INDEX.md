@@ -7,9 +7,7 @@ This is the master planning index for the Full Claudo multi-agent system. Tasks 
 _Tasks currently being worked on or planned_
 
 ### High Priority
-- [ ] `tasks/setup-planning-system/` - Initial planning system setup
-  - [ ] Configure agent prompts for planning awareness
-  - [ ] Establish work-log automation
+_None currently - system is fully operational_
 
 ### Medium Priority
 _None currently_
@@ -23,6 +21,12 @@ _Tasks that have been successfully completed_
 - [x] Initial Full Claudo architecture (2025-09-07)
 - [x] Docker sandbox configuration (2025-09-07)
 - [x] Agent prompt definitions (2025-09-07)
+- [x] Planning system setup with hierarchical task organization (2025-09-08)
+- [x] Enhanced streaming parser with color-coded output (2025-09-08)
+- [x] NPM link implementation for global claudo command (2025-09-08)
+- [x] Container conflict handling and launch fixes (2025-09-08)
+- [x] GTD-style inbox workflow implementation (2025-09-08)
+- [x] Add --version flag to claudo command (2025-09-08)
 
 ## Feature Plans
 _Strategic feature planning documents_
