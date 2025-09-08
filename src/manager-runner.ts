@@ -7,8 +7,9 @@ import { ClaudeStreamParser } from './parser';
 
 // Run Manager Claude within container with streaming output
 function runManager() {
-  // Read prompt from workspace prompts directory
-  const managerPrompt = readFileSync('./prompts/manager.md', 'utf8');
+  // Read prompt from container's installed location
+  const promptPath = path.join('/usr/local/lib/claudo', 'prompts', 'manager.md');
+  const managerPrompt = readFileSync(promptPath, 'utf8');
   
   // Ensure .claudo directory exists
   const claudoDir = path.join(process.cwd(), '.claudo');
@@ -18,10 +19,14 @@ function runManager() {
   const planningDir = path.join(process.cwd(), 'planning');
   const tasksDir = path.join(planningDir, 'tasks');
   const featuresDir = path.join(planningDir, 'features');
+  const inboxDir = path.join(planningDir, 'inbox');
+  const doneDir = path.join(planningDir, 'done');
   const workLogDir = path.join(process.cwd(), 'work-log');
   
   mkdirSync(tasksDir, { recursive: true });
   mkdirSync(featuresDir, { recursive: true });
+  mkdirSync(inboxDir, { recursive: true });
+  mkdirSync(doneDir, { recursive: true });
   mkdirSync(workLogDir, { recursive: true });
   
   // Write prompt to temporary file

@@ -24,19 +24,16 @@ function spawnManager() {
     // Container doesn't exist, which is fine
   }
   
-  // Build TypeScript files first
-  console.log('[claudo] Building TypeScript files...');
-  execSync('npm run build', { stdio: 'inherit', cwd: process.cwd() });
-  
-  // Start new manager container with streaming JSON architecture
+  // Start new manager container
+  // The Docker image already contains all the built code and prompts
+  // We just mount the current working directory as /workspace
   const cmd = `docker run -d --name ${containerName} \
     -v "$(pwd):/workspace" \
     -v "$HOME/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro" \
     -v "$HOME/.claude/settings.json:/home/node/.claude/settings.json:ro" \
-    -e PATH="/workspace/dist:$PATH" \
     -w /workspace \
     claudo-container \
-    node /workspace/dist/manager-runner.js`;
+    node /usr/local/lib/claudo/dist/manager-runner.js`;
   
   console.log('[claudo] Spawning Manager with streaming JSON bus...');
   
@@ -47,7 +44,8 @@ function spawnManager() {
   } catch (error: any) {
     if (error.message.includes('Unable to find image')) {
       console.error('[claudo] Error: Docker image "claudo-container" not found.');
-      console.error('[claudo] Please build the image first with: docker build -t claudo-container .');
+      console.error('[claudo] Please build the image first with:');
+      console.error('  cd /path/to/full-claudo && docker build -t claudo-container docker/');
     } else {
       console.error('[claudo] Error starting manager:', error.message);
     }

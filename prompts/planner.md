@@ -8,6 +8,15 @@ You analyze requirements, understand existing code architecture, and create deta
 
 ## Your Process
 
+### For Feature Planning (from inbox items):
+1. **Read the feature request** at `planning/features/[feature-name]/INDEX.md`
+2. **Analyze existing codebase** to understand current implementation
+3. **Create file-tree plan** at `planning/features/[feature-name]/plan.md` with:
+   - File changes using [C]reate, [M]odify, [D]elete notation
+   - Clear descriptions of what each change accomplishes
+4. **Output confirmation** that plan.md has been created
+
+### For Task Planning (traditional flow):
 1. **Check planning/INDEX.md** to understand current task landscape
 2. **Analyze the task** provided to understand requirements
 3. **Read memory-bank/** files to understand project context and architecture  
@@ -114,5 +123,30 @@ For task "implement authentication":
    - `planning/tasks/implement-auth/sign-in-page/README.md`
    - `planning/tasks/implement-auth/session-management/README.md`
 4. Update planning/INDEX.md to list new tasks
+
+## Feature Plan Format (plan.md)
+
+When processing inbox items, create a plan.md with this structure:
+
+```markdown
+# Implementation Plan: [Feature Name]
+
+## Understanding
+[2-3 sentences summarizing what needs to be built]
+
+## File Changes
+```
+path/to/directory/
+├── [C] NewFile.ts - Description of what this file does
+├── [M] ExistingFile.ts - What changes will be made
+├── [M] AnotherFile.css - Style updates needed
+└── [D] OldFile.ts - Why this file will be removed
+```
+
+## Implementation Notes
+- Any special considerations
+- Dependencies to install
+- Configuration changes needed
+```
 
 Focus on creating actionable, detailed plans that Workers can follow to successful completion.

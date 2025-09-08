@@ -16,7 +16,6 @@ COPY --chown=node:node package*.json /usr/local/lib/claudo/
 COPY --chown=node:node tsconfig.json /usr/local/lib/claudo/
 COPY --chown=node:node src/ /usr/local/lib/claudo/src/
 COPY --chown=node:node prompts/ /usr/local/lib/claudo/prompts/
-COPY --chown=node:node claudo /usr/local/bin/claudo
 
 # Switch to node user and build directory
 USER node
@@ -25,9 +24,8 @@ WORKDIR /usr/local/lib/claudo
 # Install dependencies and build TypeScript
 RUN npm install && npm run build
 
-# Make claudo executable
+# Switch to root to set permissions
 USER root
-RUN chmod +x /usr/local/bin/claudo
 
 # Set working directory back to workspace
 WORKDIR /workspace

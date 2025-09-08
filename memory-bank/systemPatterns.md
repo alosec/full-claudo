@@ -23,10 +23,24 @@
 
 ## Data Flow
 
+### GTD-Style English → Code Compilation
+```
+planning/inbox/feature.md (user drops raw request)
+    → Manager reads inbox item
+    → Creates planning/features/[feature]/INDEX.md
+    → Planner creates planning/features/[feature]/plan.md
+    → Worker implements per plan.md
+    → Critic validates implementation
+    → Manager moves to planning/done/YYYY-MM-DD-feature.md
+    → Git commit with working code
+    → Next inbox item
+```
+
+### Traditional Task Flow
 ```
 Task Queue (.claudo/queue.txt) 
     → Manager reads task
-    → Planner creates strategy  
+    → Planner creates strategy in planning/tasks/
     → Worker implements changes
     → Critic validates result
     → Manager updates memory-bank/

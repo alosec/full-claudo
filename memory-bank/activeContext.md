@@ -1,7 +1,7 @@
 # Active Context
 
 ## Current Phase
-🎉 SYSTEM FULLY OPERATIONAL - Multi-agent architecture with structured planning system
+🎉 SYSTEM FULLY OPERATIONAL - Multi-agent architecture with GTD-style inbox workflow
 
 ## Current Status
 - ✅ **Project Structure**: Complete directory structure created
@@ -106,6 +106,13 @@ Sample task ready: "Add --version flag to claudo command"
   - Changed prompt passing from shell substitution to cat piping
   - Added debug logging to track command execution
 - **Result**: Manager now launches successfully and reads memory bank!
+
+## GTD "English → Code Compiler" Implementation
+- ✅ **Inbox Directory**: `planning/inbox/` for dropping raw feature requests
+- ✅ **Processing Flow**: Manager reads inbox → creates features/ → assigns to Planner
+- ✅ **Feature Planning**: Planner creates file-tree based implementation plans
+- ✅ **Done Archive**: Processed items move to `planning/done/` with timestamps
+- ✅ **Updated Prompts**: Manager and Planner now aware of inbox workflow
 
 ## Current Issue: Manager Hanging After Initial Reads
 - Manager successfully starts and reads memory bank files

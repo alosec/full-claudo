@@ -47,15 +47,8 @@ function spawnAgent() {
     }
     // Map 'plan' to 'planner' for consistency
     const promptFile = agentType === 'plan' ? 'planner' : agentType;
-    // Look for prompts in container location first, then local
-    let basePrompt;
-    try {
-        basePrompt = (0, fs_1.readFileSync)(`/usr/local/lib/claudo/prompts/${promptFile}.md`, 'utf8');
-    }
-    catch (e) {
-        // Fallback to local prompts directory
-        basePrompt = (0, fs_1.readFileSync)(`./prompts/${promptFile}.md`, 'utf8');
-    }
+    // Read prompts from container's installed location
+    const basePrompt = (0, fs_1.readFileSync)(`/usr/local/lib/claudo/prompts/${promptFile}.md`, 'utf8');
     const userPrompt = promptArgs.join(' ');
     const fullPrompt = `${basePrompt}\n\nTask: ${userPrompt}`;
     // Ensure .claudo directory exists
