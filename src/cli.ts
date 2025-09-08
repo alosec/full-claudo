@@ -23,6 +23,11 @@ switch (command) {
     require(scriptPath('logs'));
     break;
 
+  case 'status':
+    const { showStatus } = require(scriptPath('status'));
+    showStatus().catch(console.error);
+    break;
+
   case 'plan':
   case 'worker':
   case 'critic':
@@ -59,6 +64,7 @@ Usage: claudo <command> [options]
 Commands:
   up           Start the Manager container
   down         Stop the Manager container
+  status       Show system status and recent activity
   logs         View Manager logs (use -f to follow)
   plan         Run the planning agent
   worker       Run the worker agent

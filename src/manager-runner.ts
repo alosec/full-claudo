@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'child_process';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, createWriteStream } from 'fs';
 import * as path from 'path';
 import { ClaudeStreamParser } from './parser';
 
@@ -52,8 +52,24 @@ function runManager() {
   // Set up stream parsing for human-readable output
   const parser = new ClaudeStreamParser('Manager');
   
-  // Connect Manager output to parser for human display
-  manager.stdout.pipe(parser);
+  // Set up debug logging to capture raw JSON
+  const debugLogPath = path.join(claudoDir, 'manager-debug.jsonl');
+  const debugStream = createWriteStream(debugLogPath, { flags: 'a' });
+  console.log('[claudo] DEBUG: Raw JSON will be logged to', debugLogPath);
+  
+  // Tee the output: send to both parser AND debug file
+  manager.stdout.on('data', (chunk) => {
+    // Write raw data to debug file
+    debugStream.write(chunk);
+    // Also send to parser
+    parser.write(chunk);
+  });
+  
+  // Add error handling for parser
+  parser.on('error', (error) => {
+    console.error('[claudo] Parser error:', error);
+    console.error('[claudo] Check', debugLogPath, 'for raw output');
+  });
   
   // Handle process events
   manager.on('error', (error) => {
