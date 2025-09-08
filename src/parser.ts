@@ -99,9 +99,15 @@ export class ClaudeStreamParser extends Transform {
             const message: StreamMessage = JSON.parse(line);
             this.processMessage(message);
           } catch (e) {
-            // Log JSON parsing errors for debugging with fallback display
+            // Enhanced verbose JSON parsing errors for debugging
             this.outputError(`[${this.agentName}] JSON parse error: ${e instanceof Error ? e.message : e}`);
-            this.outputError(`[${this.agentName}] Problematic line: ${line.substring(0, 200)}`);
+            this.outputError(`[${this.agentName}] Problematic line (${line.length} chars): ${line.substring(0, 300)}`);
+            this.outputError(`[${this.agentName}] Line starts with: "${line.substring(0, 50)}..."`);
+            this.outputError(`[${this.agentName}] Line ends with: "...${line.substring(Math.max(0, line.length - 50))}"`);
+            
+            // Show character codes for debugging special characters
+            const firstChars = line.substring(0, 20).split('').map(c => `${c}(${c.charCodeAt(0)})`).join('');
+            this.outputError(`[${this.agentName}] First 20 chars with codes: ${firstChars}`);
             
             // Fallback: show raw content if it looks like meaningful output
             if (line.length > 10 && !line.startsWith('{')) {
@@ -115,9 +121,12 @@ export class ClaudeStreamParser extends Transform {
       this.push(chunk);
       callback();
     } catch (e) {
-      // Catch any errors in the entire transform process
+      // Enhanced verbose transform errors for debugging
       this.outputError(`[${this.agentName}] Transform error: ${e instanceof Error ? e.message : e}`);
-      this.outputError(`[${this.agentName}] Chunk: ${chunk.toString().substring(0, 100)}`);
+      this.outputError(`[${this.agentName}] Error stack: ${e instanceof Error ? e.stack : 'No stack trace'}`);
+      this.outputError(`[${this.agentName}] Chunk (${chunk.toString().length} chars): ${chunk.toString().substring(0, 200)}`);
+      this.outputError(`[${this.agentName}] Buffer state: ${this.buffer.length} chars buffered`);
+      this.outputError(`[${this.agentName}] Pending tools: ${this.pendingTools.size}`);
       
       // Still pass through the chunk and continue processing
       this.push(chunk);
@@ -220,8 +229,12 @@ export class ClaudeStreamParser extends Transform {
         }
       }
     } catch (e) {
+      // Enhanced verbose message processing errors
       this.outputError(`[${this.agentName}] Error processing message: ${e instanceof Error ? e.message : e}`);
-      this.outputError(`[${this.agentName}] Message: ${JSON.stringify(message).substring(0, 300)}`);
+      this.outputError(`[${this.agentName}] Error stack: ${e instanceof Error ? e.stack : 'No stack trace'}`);
+      this.outputError(`[${this.agentName}] Message type: ${message?.type || 'unknown'}`);
+      this.outputError(`[${this.agentName}] Message content length: ${message?.message?.content?.length || 0}`);
+      this.outputError(`[${this.agentName}] Full message: ${JSON.stringify(message).substring(0, 500)}`);
     }
   }
 }
