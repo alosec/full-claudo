@@ -5,7 +5,7 @@ import { ClaudeStreamParser } from './parser';
 import * as path from 'path';
 
 /**
- * Host-based parser that reads clean JSON from docker logs (stderr filtered)
+ * Host-based parser that reads clean JSON directly from manager output file
  * This runs on the host machine where console.log works reliably
  */
 
@@ -28,10 +28,10 @@ export class HostDockerParser {
    */
   start(): Promise<void> {
     return new Promise((resolve, reject) => {
-      console.log(`[claudo] Following clean JSON from docker logs (stderr filtered)...`);
+      console.log(`[claudo] Following manager output from file: ${this.outputFile}`);
       
-      // Use docker logs with stderr filtered to get clean JSON stream
-      this.tailProcess = spawn('bash', ['-c', 'docker logs -f claudo-manager 2>/dev/null'], {
+      // Use tail to read directly from manager output file
+      this.tailProcess = spawn('bash', ['-c', `tail -f ${this.outputFile}`], {
         stdio: ['ignore', 'pipe', 'pipe']
       });
 
@@ -42,27 +42,27 @@ export class HostDockerParser {
 
       // Handle errors
       this.tailProcess.on('error', (error) => {
-        console.error('[claudo] Docker logs process error:', error.message);
+        console.error('[claudo] Tail process error:', error.message);
         reject(error);
       });
 
-      // Handle stderr from docker logs command
+      // Handle stderr from tail command
       if (this.tailProcess.stderr) {
         this.tailProcess.stderr.on('data', (data) => {
           const errorText = data.toString().trim();
-          if (errorText.includes('No such container')) {
-            console.error('[claudo] Container not found. Use "claudo up" to start the manager first.');
+          if (errorText.includes('No such file')) {
+            console.error('[claudo] Manager output file not found. Ensure manager is running and writing to:', this.outputFile);
             this.stop();
-            reject(new Error('Container not found'));
+            reject(new Error('Output file not found'));
           } else if (errorText) {
-            console.error('[claudo] Docker logs stderr:', errorText);
+            console.error('[claudo] Tail stderr:', errorText);
           }
         });
       }
 
       // Handle process exit
       this.tailProcess.on('close', (code) => {
-        console.log(`[claudo] Docker logs process exited with code ${code}`);
+        console.log(`[claudo] Tail process exited with code ${code}`);
         resolve();
       });
 
@@ -72,11 +72,11 @@ export class HostDockerParser {
   }
 
   /**
-   * Stop following docker logs
+   * Stop following file tail
    */
   stop(): void {
     if (this.tailProcess) {
-      console.log('\n[claudo] Stopping docker logs parser...');
+      console.log('\n[claudo] Stopping file tail parser...');
       this.tailProcess.kill('SIGTERM');
       this.tailProcess = null;
     }
