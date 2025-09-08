@@ -13,6 +13,9 @@ export class HostDockerParser {
   private tailProcess: ChildProcess | null = null;
   private parser: ClaudeStreamParser;
   private outputFile: string;
+  private lastDataTime: number = Date.now();
+  private bytesRead: number = 0;
+  private healthMonitor?: NodeJS.Timeout;
 
   constructor(workDir: string = '/home/alex/code/full-claudo', agentName: string = 'Manager') {
     this.outputFile = path.join(workDir, '.claudo', 'manager-output.jsonl');
@@ -30,14 +33,46 @@ export class HostDockerParser {
     return new Promise((resolve, reject) => {
       console.log(`[claudo] Following manager output from file: ${this.outputFile}`);
       
+      // Start health monitoring
+      this.healthMonitor = setInterval(() => {
+        const timeSinceData = Date.now() - this.lastDataTime;
+        if (timeSinceData > 15000) { // 15 seconds without data
+          console.error(`[claudo] Warning: No data from tail for ${Math.floor(timeSinceData / 1000)}s`);
+          console.error(`[claudo] Bytes read so far: ${this.bytesRead}`);
+          
+          // Check if tail process is still alive
+          if (this.tailProcess && !this.tailProcess.killed) {
+            console.error(`[claudo] Tail process is still running (PID: ${this.tailProcess.pid})`);
+          } else {
+            console.error(`[claudo] Tail process appears to be dead`);
+            this.restartTail();
+          }
+        }
+      }, 5000);
+      
       // Use tail to read directly from manager output file
       this.tailProcess = spawn('bash', ['-c', `tail -f ${this.outputFile}`], {
         stdio: ['ignore', 'pipe', 'pipe']
       });
 
-      // Pipe tail output through our parser
+      // Pipe tail output through our parser with monitoring
       if (this.tailProcess.stdout) {
-        this.tailProcess.stdout.pipe(this.parser);
+        // Monitor data flow
+        this.tailProcess.stdout.on('data', (chunk) => {
+          this.lastDataTime = Date.now();
+          this.bytesRead += chunk.length;
+          console.error(`[claudo-debug] Received ${chunk.length} bytes from tail (total: ${this.bytesRead})`);
+        });
+        
+        // Add error handling to the pipe
+        this.tailProcess.stdout
+          .on('error', (err) => {
+            console.error('[claudo] Tail stdout error:', err.message);
+          })
+          .pipe(this.parser)
+          .on('error', (err) => {
+            console.error('[claudo] Parser pipe error:', err.message);
+          });
       }
 
       // Handle errors
@@ -75,11 +110,28 @@ export class HostDockerParser {
    * Stop following file tail
    */
   stop(): void {
+    if (this.healthMonitor) {
+      clearInterval(this.healthMonitor);
+      this.healthMonitor = undefined;
+    }
     if (this.tailProcess) {
       console.log('\n[claudo] Stopping file tail parser...');
       this.tailProcess.kill('SIGTERM');
       this.tailProcess = null;
     }
+  }
+  
+  /**
+   * Restart the tail process if it dies
+   */
+  private restartTail(): void {
+    console.error('[claudo] Attempting to restart tail process...');
+    this.stop();
+    setTimeout(() => {
+      this.start().catch((error) => {
+        console.error('[claudo] Failed to restart tail:', error.message);
+      });
+    }, 1000);
   }
 
   /**

@@ -1,17 +1,33 @@
 # Active Context
 
 ## Current Phase
-⚠️ NEW ISSUE: Parser receiving debug messages mixed with JSON stream
+🔧 DEBUGGING: Parser silent failure issue - enhanced error handling added
 
-## Latest Problem: Mixed Output Stream
-The host-based parser is receiving both debug messages and JSON from `docker logs`:
-```
-[claudo] Starting Manager with streaming JSON bus...  <- NOT JSON
-[claudo] DEBUG: Prompt file saved to...               <- NOT JSON
-{"type":"assistant","message":{"content":[...]}}     <- ACTUAL JSON
-```
+## Latest Updates: Stream Error Handling
+Added comprehensive error handling and monitoring to diagnose silent parser failures:
 
-This causes parse errors as the parser tries to parse debug messages as JSON.
+### Changes Made:
+1. **parser.ts enhancements:**
+   - Added stream backpressure handling
+   - Enhanced error catching in output functions
+   - Added health monitoring with 10-second timeout warnings
+   - Implemented setImmediate for async processing to prevent stack overflow
+   - Added line counting and timing metrics
+
+2. **host-parser.ts monitoring:**
+   - Added data flow monitoring (bytes read, last data time)
+   - Health check every 5 seconds
+   - Auto-restart capability if tail process dies
+   - Enhanced error reporting on pipe failures
+
+3. **parser-debug.ts diagnostic tool:**
+   - Comprehensive stream flow tracing
+   - Monitors chunk reception, line processing, console output
+   - Logs all events to `.claudo/parser-debug.log`
+   - Health checks every 5 seconds with full metrics
+
+### Debug Results:
+The parser IS receiving and processing data - debug output shows successful parsing of JSON messages. The issue appears to be intermittent rather than a complete failure.
 
 ## Escaping Issues - Recurring Theme
 **Escaping problems have been a consistent challenge throughout this project:**
