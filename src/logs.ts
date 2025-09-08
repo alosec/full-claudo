@@ -22,7 +22,7 @@ function showLogs() {
       console.log('[claudo] Press Ctrl+C to stop.');
       
       // Use host-based parser for live output with parsing
-      const parser = new HostDockerParser(containerName, 'Manager');
+      const parser = new HostDockerParser(process.cwd(), 'Manager');
       parser.start().catch((error) => {
         console.error('[claudo] Parser failed:', error.message);
         console.log('[claudo] Falling back to raw docker logs...');

@@ -2,19 +2,20 @@
 
 import { spawn, ChildProcess } from 'child_process';
 import { ClaudeStreamParser } from './parser';
+import * as path from 'path';
 
 /**
- * Host-based parser that reads docker logs and parses Claude's JSON stream
+ * Host-based parser that reads clean JSON from manager-output.jsonl
  * This runs on the host machine where console.log works reliably
  */
 
 export class HostDockerParser {
-  private dockerProcess: ChildProcess | null = null;
+  private tailProcess: ChildProcess | null = null;
   private parser: ClaudeStreamParser;
-  private containerName: string;
+  private outputFile: string;
 
-  constructor(containerName: string = 'claudo-manager', agentName: string = 'Manager') {
-    this.containerName = containerName;
+  constructor(workDir: string = '/home/alex/code/full-claudo', agentName: string = 'Manager') {
+    this.outputFile = path.join(workDir, '.claudo', 'manager-output.jsonl');
     this.parser = new ClaudeStreamParser({
       agentName,
       useColors: true, // Colors work on host
@@ -23,44 +24,44 @@ export class HostDockerParser {
   }
 
   /**
-   * Start following docker logs and parsing output
+   * Start tailing manager output file and parsing JSON
    */
   start(): Promise<void> {
     return new Promise((resolve, reject) => {
-      console.log(`[claudo] Following logs from ${this.containerName}...`);
+      console.log(`[claudo] Following clean JSON from ${this.outputFile}...`);
       
-      this.dockerProcess = spawn('docker', ['logs', '-f', this.containerName], {
+      this.tailProcess = spawn('tail', ['-f', this.outputFile], {
         stdio: ['ignore', 'pipe', 'pipe']
       });
 
-      // Pipe docker logs through our parser
-      if (this.dockerProcess.stdout) {
-        this.dockerProcess.stdout.pipe(this.parser);
+      // Pipe tail output through our parser
+      if (this.tailProcess.stdout) {
+        this.tailProcess.stdout.pipe(this.parser);
       }
 
       // Handle errors
-      this.dockerProcess.on('error', (error) => {
-        console.error('[claudo] Docker logs error:', error.message);
+      this.tailProcess.on('error', (error) => {
+        console.error('[claudo] Tail process error:', error.message);
         reject(error);
       });
 
-      // Handle stderr from docker logs
-      if (this.dockerProcess.stderr) {
-        this.dockerProcess.stderr.on('data', (data) => {
+      // Handle stderr from tail
+      if (this.tailProcess.stderr) {
+        this.tailProcess.stderr.on('data', (data) => {
           const errorText = data.toString().trim();
-          if (errorText.includes('No such container')) {
-            console.error('[claudo] Container not found. Use "claudo up" to start the manager first.');
+          if (errorText.includes('No such file')) {
+            console.error('[claudo] Output file not found. Use "claudo up" to start the manager first.');
             this.stop();
-            reject(new Error('Container not found'));
+            reject(new Error('Output file not found'));
           } else if (errorText) {
-            console.error('[claudo] Docker stderr:', errorText);
+            console.error('[claudo] Tail stderr:', errorText);
           }
         });
       }
 
       // Handle process exit
-      this.dockerProcess.on('close', (code) => {
-        console.log(`[claudo] Docker logs process exited with code ${code}`);
+      this.tailProcess.on('close', (code) => {
+        console.log(`[claudo] Tail process exited with code ${code}`);
         resolve();
       });
 
@@ -70,13 +71,13 @@ export class HostDockerParser {
   }
 
   /**
-   * Stop following logs
+   * Stop tailing output file
    */
   stop(): void {
-    if (this.dockerProcess) {
-      console.log('\n[claudo] Stopping log parser...');
-      this.dockerProcess.kill('SIGTERM');
-      this.dockerProcess = null;
+    if (this.tailProcess) {
+      console.log('\n[claudo] Stopping tail parser...');
+      this.tailProcess.kill('SIGTERM');
+      this.tailProcess = null;
     }
   }
 
@@ -94,12 +95,12 @@ export class HostDockerParser {
   }
 }
 
-// CLI usage: node host-parser.js [container-name] [agent-name]
+// CLI usage: node host-parser.js [work-dir] [agent-name]
 if (require.main === module) {
-  const containerName = process.argv[2] || 'claudo-manager';
+  const workDir = process.argv[2] || '/home/alex/code/full-claudo';
   const agentName = process.argv[3] || 'Manager';
   
-  const parser = new HostDockerParser(containerName, agentName);
+  const parser = new HostDockerParser(workDir, agentName);
   
   parser.start().catch((error) => {
     console.error('[claudo] Parser failed:', error.message);

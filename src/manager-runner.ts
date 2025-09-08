@@ -42,15 +42,15 @@ function runManager() {
     }
   });
   
-  // Set up debug logging to capture raw JSON
-  const debugLogPath = path.join(claudoDir, 'manager-debug.jsonl');
-  const debugStream = createWriteStream(debugLogPath, { flags: 'a' });
-  console.log('[claudo] DEBUG: Raw JSON will be logged to', debugLogPath);
+  // Set up output logging to capture clean JSON stream
+  const outputLogPath = path.join(claudoDir, 'manager-output.jsonl');
+  const outputStream = createWriteStream(outputLogPath, { flags: 'a' });
+  console.log('[claudo] DEBUG: Raw JSON will be logged to', outputLogPath);
   
-  // Output raw JSON directly to stdout and save to debug file
+  // Output raw JSON directly to stdout and save to output file
   // No parsing - let the host-based parser handle it
   manager.stdout.pipe(process.stdout);
-  manager.stdout.pipe(debugStream);
+  manager.stdout.pipe(outputStream);
   
   // Handle process events
   manager.on('error', (error) => {
@@ -63,7 +63,7 @@ function runManager() {
   
   manager.on('close', (code) => {
     console.log(`[claudo] Manager process exited with code ${code}`);
-    debugStream.end();
+    outputStream.end();
   });
   
   // Handle container termination

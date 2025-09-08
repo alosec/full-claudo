@@ -51,7 +51,7 @@ function spawnManager() {
     console.log('[claudo] Waiting for container to start...\n');
     setTimeout(() => {
       // Start host-based parser to show live output
-      const parser = new HostDockerParser(containerName, 'Manager');
+      const parser = new HostDockerParser(process.cwd(), 'Manager');
       parser.start().catch((error) => {
         console.error('[claudo] Parser failed:', error.message);
         console.log('[claudo] Use "claudo logs" to view output manually.');
