@@ -114,11 +114,17 @@
 
 **Result**: Manager now launches successfully and reads memory bank files!
 
-## Current Issue: Manager Hanging
-- Manager starts successfully and reads memory bank
-- Executes initial tools (git status, read queue) properly
-- Appears to hang after initial executions
-- May be stream parsing or agent communication issue
+## ✅ Parser Architecture Simplified (COMPLETED)
+**Problem**: Console.log stopping after ~3 seconds in Docker container
+**Solution**: Moved parser to host machine where console.log works reliably
+**Implementation**:
+- Removed `tty-detector.ts` and all TTY detection logic
+- Simplified `up.ts` to always use detached mode with host parser  
+- Simplified `manager-runner.ts` to output raw JSON only
+- Created `host-parser.ts` for reliable host-based parsing
+- Updated `logs.ts` to use host-based parser for live output
+
+**Result**: ✅ Simple, reliable, and maintainable architecture - no more complex output issues
 
 ## Future Testing Phase  
 1. **Planning System Test**: Create sample hierarchical tasks using updated agents

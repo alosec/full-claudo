@@ -1,38 +1,32 @@
 # Active Context
 
 ## Current Phase
-🔧 PARSER OUTPUT ISSUES - Fighting Docker/Node.js stdout behavior
+✅ PARSER ARCHITECTURE SIMPLIFIED - Fixed output issues with host-based parsing
 
-## Recent Work: Streaming Parser Complexity Spiral
+## Recent Work: Architecture Simplification Success
 
-### The Core Problem
-Console.log mysteriously stops working after ~3 seconds when running parser in Docker container, even though Claude continues producing JSON output.
+### Problem Resolution
+**SOLVED**: Console.log stopping after ~3 seconds in Docker container by moving parser to host machine where console.log works reliably.
 
-### Our Journey of Increasing Complexity
+### The Journey to Simplicity
 1. **Initial Problem**: Parser output stops after ~3 seconds, Claude keeps going
-2. **First Attempt**: Created complex "bulletproof" parser with:
-   - Direct file descriptor writes
-   - Heartbeat monitoring
-   - Multiple fallback mechanisms
-   - Result: Still failed
-3. **Second Attempt**: Tried Docker interactive mode (`-it`) for proper TTY
-   - Result: Doesn't work in non-TTY environments like Claude Code
-4. **Current Approach**: TTY detection with dual strategies
-   - Interactive mode in real terminals
-   - Detached mode with file output elsewhere
-   - Result: Partially working but increasingly complex
+2. **Complex Solutions**: Multiple attempts with TTY detection, file output, heartbeats
+3. **Final Solution**: Move parser to host machine where console.log works
+   - **Result**: ✅ Simple, reliable, and maintainable
 
-### Where We've Ended Up
-From a simple streaming parser to:
-- Multiple parser versions (parser.ts, parser-v2.ts, parser-improved.ts)
-- TTY detection utilities
-- Dual output modes (console vs file)
-- Different Docker strategies based on environment
-- Multiple fallback mechanisms
-- File-based output alternatives
+### Simplified Architecture
+**New approach eliminates all complexity:**
+- Manager outputs raw JSON to Docker logs (stdout works fine)
+- Host-based parser reads `docker logs -f` and parses JSON stream
+- Console.log works perfectly on host machine
+- Single, simple implementation path
 
-### The Bigger Picture
-**We're fighting the architecture rather than working with it.** Each "fix" introduces new edge cases and complexity.
+### Key Architectural Changes
+- ✅ Removed `tty-detector.ts` and all TTY detection logic
+- ✅ Simplified `up.ts` to always use detached mode with host parser
+- ✅ Simplified `manager-runner.ts` to output raw JSON only
+- ✅ Created `host-parser.ts` for reliable host-based parsing
+- ✅ Updated `logs.ts` to use host-based parser for live output
 
 ## Current Status
 - ✅ **TTY Detection**: Works correctly

@@ -3,17 +3,12 @@
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, mkdirSync, createWriteStream } from 'fs';
 import * as path from 'path';
-import { ClaudeStreamParser, ParserOptions } from './parser';
 
-// Run Manager Claude within container with streaming output
+// Run Manager Claude within container - simplified to only output raw JSON
 function runManager() {
   const workDir = '/workspace';
   const claudoDir = path.join(workDir, '.claudo');
   const managerSystemPrompt = path.join(workDir, 'prompts', 'manager.md');
-  
-  // Check if we're in file output mode (passed as CLI argument)
-  const useFileOutput = process.argv.includes('--output-file');
-  const outputFile = useFileOutput ? path.join(claudoDir, 'manager-output.log') : undefined;
   
   // Ensure .claudo directory exists
   try {
@@ -47,41 +42,15 @@ function runManager() {
     }
   });
   
-  // Set up stream parsing with appropriate output mode
-  const parserOptions: ParserOptions = {
-    agentName: 'Manager',
-    useColors: !useFileOutput,  // Disable colors when writing to file
-    outputFile: outputFile
-  };
-  
-  const parser = new ClaudeStreamParser(parserOptions);
-  
-  if (useFileOutput && outputFile) {
-    console.log(`[claudo] Parser output will be written to: ${outputFile}`);
-    // Clear the output file at start
-    writeFileSync(outputFile, '');
-  }
-  
   // Set up debug logging to capture raw JSON
   const debugLogPath = path.join(claudoDir, 'manager-debug.jsonl');
   const debugStream = createWriteStream(debugLogPath, { flags: 'a' });
   console.log('[claudo] DEBUG: Raw JSON will be logged to', debugLogPath);
   
-  // Pipe stdout through parser and also to debug file
-  manager.stdout.pipe(parser);
+  // Output raw JSON directly to stdout and save to debug file
+  // No parsing - let the host-based parser handle it
+  manager.stdout.pipe(process.stdout);
   manager.stdout.pipe(debugStream);
-  
-  // Add error handling for parser
-  parser.on('error', (error) => {
-    console.error('[claudo] Parser error:', error);
-    console.error('[claudo] Check', debugLogPath, 'for raw output');
-  });
-  
-  parser.on('parser-error', (details) => {
-    if (details.context === '_transform') {
-      console.error('[claudo] Transform error, continuing...', details.error.message);
-    }
-  });
   
   // Handle process events
   manager.on('error', (error) => {
@@ -95,7 +64,6 @@ function runManager() {
   manager.on('close', (code) => {
     console.log(`[claudo] Manager process exited with code ${code}`);
     debugStream.end();
-    parser.destroy();
   });
   
   // Handle container termination

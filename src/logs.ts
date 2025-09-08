@@ -1,113 +1,82 @@
 #!/usr/bin/env node
 
 import { spawn, execSync } from 'child_process';
-import { existsSync } from 'fs';
-import * as path from 'path';
+import { HostDockerParser } from './host-parser';
 
-// Handle claudo logs command - intelligently choose between attach and tail
+// Handle claudo logs command - simplified to use host-based parser
 function showLogs() {
   const containerName = 'claudo-manager';
-  const outputFile = path.join(process.cwd(), '.claudo', 'manager-output.log');
   
-  // Check if container is running
-  let containerRunning = false;
-  let isInteractive = false;
+  // Check if container exists
+  let containerExists = false;
   
   try {
     const containerStatus = execSync(`docker inspect -f '{{.State.Status}}' ${containerName} 2>/dev/null`, { 
       encoding: 'utf-8' 
     }).trim();
     
-    containerRunning = containerStatus === 'running';
+    containerExists = true;
     
-    if (containerRunning) {
-      // Check if container was started with -it (interactive)
-      const containerConfig = execSync(`docker inspect -f '{{.Config.AttachStdout}}' ${containerName} 2>/dev/null`, { 
-        encoding: 'utf-8' 
-      }).trim();
+    if (containerStatus === 'running') {
+      console.log(`[claudo] Showing live parsed output for ${containerName}...`);
+      console.log('[claudo] Press Ctrl+C to stop.');
       
-      isInteractive = containerConfig === 'true';
+      // Use host-based parser for live output with parsing
+      const parser = new HostDockerParser(containerName, 'Manager');
+      parser.start().catch((error) => {
+        console.error('[claudo] Parser failed:', error.message);
+        console.log('[claudo] Falling back to raw docker logs...');
+        showRawLogs(containerName);
+      });
+      
+    } else {
+      console.log(`[claudo] Container ${containerName} is not running (${containerStatus}).`);
+      console.log('[claudo] Showing historical logs...');
+      showRawLogs(containerName);
     }
+    
   } catch (e) {
     // Container doesn't exist
-  }
-  
-  if (containerRunning) {
-    // Container is running - use docker logs (works for both interactive and detached)
-    console.log(`[claudo] Showing logs for ${containerName}...`);
-    console.log('[claudo] Press Ctrl+C to stop.');
-    
-    const logsProcess = spawn('docker', ['logs', '-f', containerName], {
-      stdio: 'inherit',
-      shell: false
-    });
-    
-    logsProcess.on('error', (error: any) => {
-      console.error('[claudo] Error getting logs:', error.message);
-      process.exit(1);
-    });
-    
-    logsProcess.on('close', (code) => {
-      process.exit(code || 0);
-    });
-    
-    // Handle graceful shutdown
-    process.on('SIGINT', () => {
-      console.log('\n[claudo] Stopping logs...');
-      logsProcess.kill('SIGINT');
-    });
-    
-  } else if (existsSync(outputFile)) {
-    // Use file output (for detached mode or when container is stopped)
-    console.log(`[claudo] Tailing output from ${outputFile}...`);
-    console.log('[claudo] Press Ctrl+C to stop.');
-    
-    const args = process.argv.slice(2);
-    const tailArgs = ['-f'];
-    
-    // Handle --tail flag
-    const tailIndex = args.findIndex(arg => arg === '--tail');
-    if (tailIndex !== -1 && args[tailIndex + 1]) {
-      tailArgs.push('-n', args[tailIndex + 1]);
-    } else if (!args.includes('-f') && !args.includes('--follow')) {
-      // Show last 50 lines by default if not following
-      tailArgs.push('-n', '50');
-      tailArgs.splice(tailArgs.indexOf('-f'), 1); // Remove -f
-    }
-    
-    tailArgs.push(outputFile);
-    
-    const tailProcess = spawn('tail', tailArgs, {
-      stdio: 'inherit',
-      shell: false
-    });
-    
-    tailProcess.on('error', (error: any) => {
-      if (error.message.includes('ENOENT')) {
-        console.error('[claudo] Error: tail command not found.');
-      } else {
-        console.error('[claudo] Error reading logs:', error.message);
-      }
-      process.exit(1);
-    });
-    
-    tailProcess.on('close', (code) => {
-      process.exit(code || 0);
-    });
-    
-    // Handle graceful shutdown
-    process.on('SIGINT', () => {
-      console.log('\n[claudo] Stopping log tail...');
-      tailProcess.kill('SIGINT');
-    });
-    
-  } else {
-    // No container and no output file
     console.error('[claudo] No logs available.');
-    console.error('[claudo] Manager is not running and no output file found.');
+    console.error('[claudo] Manager container not found.');
     console.error('[claudo] Use "claudo up" to start the manager first.');
     process.exit(1);
   }
+}
+
+// Fallback to raw docker logs without parsing
+function showRawLogs(containerName: string) {
+  const args = process.argv.slice(2);
+  const logsArgs = ['logs'];
+  
+  // Handle common flags
+  if (!args.includes('--tail')) {
+    logsArgs.push('--tail', '100'); // Show last 100 lines by default
+  }
+  
+  // Add any user flags
+  logsArgs.push(...args);
+  logsArgs.push(containerName);
+  
+  const logsProcess = spawn('docker', logsArgs, {
+    stdio: 'inherit',
+    shell: false
+  });
+  
+  logsProcess.on('error', (error: any) => {
+    console.error('[claudo] Error getting logs:', error.message);
+    process.exit(1);
+  });
+  
+  logsProcess.on('close', (code) => {
+    process.exit(code || 0);
+  });
+  
+  // Handle graceful shutdown
+  process.on('SIGINT', () => {
+    console.log('\n[claudo] Stopping logs...');
+    logsProcess.kill('SIGINT');
+  });
 }
 
 showLogs();
