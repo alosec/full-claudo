@@ -61,7 +61,6 @@ export class HostDockerParser {
         this.tailProcess.stdout.on('data', (chunk) => {
           this.lastDataTime = Date.now();
           this.bytesRead += chunk.length;
-          console.error(`[claudo-debug] Received ${chunk.length} bytes from tail (total: ${this.bytesRead})`);
         });
         
         // Pipe to parser only (parser outputs directly via console.log)

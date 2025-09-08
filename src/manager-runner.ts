@@ -23,14 +23,10 @@ function runManager() {
   // Save prompt for debugging
   const promptFile = path.join(claudoDir, 'manager-prompt.txt');
   writeFileSync(promptFile, fullPrompt);
-  console.error('[claudo] DEBUG: Prompt file saved to:', promptFile);
-  console.error('[claudo] DEBUG: Prompt length:', fullPrompt.length);
   
   // Build the command to pipe prompt to claude
   const command = `cat "${promptFile}" | claude --dangerously-skip-permissions --output-format stream-json --input-format text --verbose --model sonnet`;
   
-  console.error('[claudo] DEBUG: Executing command via bash -c');
-  console.error('[claudo] DEBUG: Command:', command);
   
   // Spawn the command in container context
   const manager = spawn('bash', ['-c', command], {
@@ -45,7 +41,6 @@ function runManager() {
   // Set up output logging to capture clean JSON stream
   const outputLogPath = path.join(claudoDir, 'manager-output.jsonl');
   const outputStream = createWriteStream(outputLogPath, { flags: 'a' });
-  console.error('[claudo] DEBUG: Raw JSON will be logged to', outputLogPath);
   
   // Output raw JSON directly to stdout and save to output file
   // No parsing - let the host-based parser handle it
