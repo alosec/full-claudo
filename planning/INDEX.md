@@ -7,7 +7,7 @@ This is the master planning index for the Full Claudo multi-agent system. Tasks 
 _Tasks currently being worked on or planned_
 
 ### High Priority
-_None currently - system is fully operational_
+_None currently_
 
 ### Medium Priority
 _None currently_
@@ -27,6 +27,9 @@ _Tasks that have been successfully completed_
 - [x] Container conflict handling and launch fixes (2025-09-08)
 - [x] GTD-style inbox workflow implementation (2025-09-08)
 - [x] Add --version flag to claudo command (2025-09-08)
+- [x] Status command feature - shows system status and recent activity (2025-09-08)
+- [x] Fix phantom logging issue - enhanced error handling in ClaudeStreamParser (2025-09-08)
+- [x] Fix claudo status command blank output issue - Docker container needs rebuild (2025-09-08)
 
 ## Feature Plans
 _Strategic feature planning documents_

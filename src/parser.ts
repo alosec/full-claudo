@@ -81,7 +81,9 @@ class ClaudeStreamParser extends Transform {
           const message: StreamMessage = JSON.parse(line);
           this.processMessage(message);
         } catch (e) {
-          // Skip invalid JSON lines
+          // Log JSON parsing errors for debugging
+          console.error(`[${this.agentName}] JSON parse error:`, e instanceof Error ? e.message : e);
+          console.error(`[${this.agentName}] Problematic line:`, line.substring(0, 200));
         }
       }
     }
@@ -137,7 +139,8 @@ class ClaudeStreamParser extends Transform {
   }
 
   private processMessage(message: StreamMessage) {
-    const prefix = `[${this.formatColor(this.agentName, 'bright')}]`;
+    try {
+      const prefix = `[${this.formatColor(this.agentName, 'bright')}]`;
     
     if (message.type === 'assistant' && message.message?.content) {
       for (const content of message.message.content) {
@@ -190,6 +193,10 @@ class ClaudeStreamParser extends Transform {
           this.pendingTools.delete(content.tool_use_id);
         }
       }
+    }
+    } catch (e) {
+      console.error(`[${this.agentName}] Error processing message:`, e instanceof Error ? e.message : e);
+      console.error(`[${this.agentName}] Message:`, JSON.stringify(message).substring(0, 300));
     }
   }
 }
