@@ -5,6 +5,22 @@ import { readFileSync, writeFileSync, mkdirSync, createWriteStream, existsSync }
 import * as path from 'path';
 import { ClaudeStreamParser } from './parser';
 
+// Extended interfaces for parser statistics and events
+interface ParserWithStatistics {
+  getStatistics?(): {
+    lines: number;
+    success: number;
+    errors: number;
+    errorRate: number;
+    pendingTools: number;
+  };
+}
+
+interface ParserWithEvents {
+  on(event: 'parser-error', callback: (data: { context: string; error: any; data?: any }) => void): void;
+  on(event: string, callback: (...args: any[]) => void): void;
+}
+
 /**
  * Complex test to reproduce real-world hanging scenario
  * This mimics the actual manager behavior that causes parser to hang
@@ -90,7 +106,7 @@ This simulates the real manager flow that causes hanging.`;
     // Print statistics before killing
     if (parser) {
       try {
-        const stats = (parser as any).getStatistics?.();
+        const stats = (parser as ClaudeStreamParser & ParserWithStatistics).getStatistics?.();
         if (stats) {
           console.log('[complex-test] Parser statistics at timeout:', stats);
         }
@@ -125,17 +141,12 @@ This simulates the real manager flow that causes hanging.`;
   // Set up parser
   let parser: ClaudeStreamParser | null = null;
   if (!noParser) {
-    if (useImprovedParser) {
-      // Import and use improved parser if requested
-      const { ImprovedClaudeStreamParser } = require('./parser-improved');
-      parser = new ImprovedClaudeStreamParser({
-        agentName: 'ComplexTest',
-        verboseErrors: true,
-        fallbackToRaw: true
-      });
-    } else {
-      parser = new ClaudeStreamParser('ComplexTest', true);
-    }
+    parser = new ClaudeStreamParser({
+      agentName: 'ComplexTest',
+      verboseErrors: useImprovedParser || true,
+      fallbackToRaw: true,
+      enableHeartbeat: true
+    });
     
     // Track parser errors
     parser?.on('error', (error) => {
@@ -144,7 +155,7 @@ This simulates the real manager flow that causes hanging.`;
     });
 
     // Monitor parser events if available
-    (parser as any).on('parser-error', (data: any) => {
+    (parser as ClaudeStreamParser & ParserWithEvents).on('parser-error', (data: { context: string; error: any; data?: any }) => {
       console.error('[complex-test] Parser internal error:', data);
     });
   }

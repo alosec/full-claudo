@@ -30,6 +30,7 @@ _Tasks that have been successfully completed_
 - [x] Status command feature - shows system status and recent activity (2025-09-08)
 - [x] Fix phantom logging issue - enhanced error handling in ClaudeStreamParser (2025-09-08)
 - [x] Fix claudo status command blank output issue - Docker container needs rebuild (2025-09-08)
+- [x] Fix parser types - remove 'as any' type assertions with proper interfaces (2025-09-08)
 
 ## Feature Plans
 _Strategic feature planning documents_
