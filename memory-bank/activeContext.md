@@ -181,3 +181,4 @@ Parser (`src/parser.ts`) dies silently without errors, leaving users blind to on
 - Structured planning system with hierarchical task organization ✅
 - Automated work logging with timestamp tracking ✅
 - Version flag support added ✅
+- TypeScript type safety improvements (removed 'as any' assertions) ✅

@@ -1,70 +1,54 @@
 #!/usr/bin/env node
 
 import { Transform } from 'stream';
+import * as fs from 'fs';
 
-// Complete Claude streaming JSON message types
+interface ToolUseContent {
+  type: 'tool_use';
+  id: string;
+  name: string;
+  input: any;
+}
+
+interface TextContent {
+  type: 'text';
+  text: string;
+}
+
+interface ToolResultContent {
+  type: 'tool_result';
+  tool_use_id: string;
+  content: string;
+  is_error?: boolean;
+}
+
 interface AssistantMessage {
   type: 'assistant';
   message?: {
-    id: string;
-    type: 'message';
-    role: 'assistant';
-    model: string;
-    content: Array<{
-      type: 'text' | 'tool_use';
-      text?: string;
-      id?: string;
-      name?: string;
-      input?: {
-        command?: string;
-        description?: string;
-        file_path?: string;
-        old_string?: string;
-        new_string?: string;
-        [key: string]: any;
-      };
-    }>;
-    stop_reason?: string | null;
-    stop_sequence?: string | null;
-    usage?: {
-      input_tokens: number;
-      output_tokens: number;
-      cache_creation_input_tokens?: number;
-      cache_read_input_tokens?: number;
-    };
+    content: Array<TextContent | ToolUseContent>;
   };
-  parent_tool_use_id?: string | null;
-  session_id?: string;
-  uuid?: string;
 }
 
 interface UserMessage {
   type: 'user';
   message?: {
-    role: 'user';
-    content: Array<{
-      type: 'tool_result';
-      tool_use_id: string;
-      content: string;
-      is_error?: boolean;
-    }>;
+    content: Array<ToolResultContent>;
   };
-  parent_tool_use_id?: string | null;
-  session_id?: string;
-  uuid?: string;
 }
 
 type StreamMessage = AssistantMessage | UserMessage;
 
-interface ParserOptions {
+export interface ParserOptions {
   agentName?: string;
   useColors?: boolean;
   verboseErrors?: boolean;
   fallbackToRaw?: boolean;
   maxOutputLength?: number;
+  outputFd?: number; // File descriptor for output (default: 1 for stdout)
+  errorFd?: number;  // File descriptor for errors (default: 2 for stderr)
 }
 
-class ImprovedClaudeStreamParser extends Transform {
+export class BulletproofParser extends Transform {
   private agentName: string;
   private buffer: string = '';
   private pendingTools: Map<string, { name: string; input: any; startTime: number }> = new Map();
@@ -76,14 +60,68 @@ class ImprovedClaudeStreamParser extends Transform {
   private errorCount: number = 0;
   private lineCount: number = 0;
   private successCount: number = 0;
+  private outputFd: number;
+  private errorFd: number;
+  private outputBuffer: string[] = [];
+  private flushTimer: NodeJS.Timeout | null = null;
 
   constructor(options: ParserOptions = {}) {
-    super({ objectMode: true });
+    super({ objectMode: false });
+    
     this.agentName = options.agentName || 'Agent';
     this.useColors = (options.useColors !== false) && process.stdout.isTTY;
     this.verboseErrors = options.verboseErrors || false;
-    this.fallbackToRaw = options.fallbackToRaw !== false; // Default true
+    this.fallbackToRaw = options.fallbackToRaw !== false;
     this.maxOutputLength = options.maxOutputLength || 1000;
+    this.outputFd = options.outputFd ?? 1; // stdout
+    this.errorFd = options.errorFd ?? 2;  // stderr
+    
+    // Periodic flush to ensure output
+    this.startPeriodicFlush();
+  }
+
+  private startPeriodicFlush() {
+    this.flushTimer = setInterval(() => {
+      this.flushOutput();
+    }, 100); // Flush every 100ms
+  }
+
+  private writeDirectly(message: string, fd?: number) {
+    const targetFd = fd ?? this.outputFd;
+    const buffer = Buffer.from(message + '\n');
+    
+    try {
+      // Direct synchronous write to file descriptor
+      fs.writeSync(targetFd, buffer);
+    } catch (e) {
+      // If primary FD fails, try stderr
+      if (targetFd !== this.errorFd) {
+        try {
+          fs.writeSync(this.errorFd, Buffer.from(`[FALLBACK] ${message}\n`));
+        } catch (e2) {
+          // Absolute last resort - buffer it
+          this.outputBuffer.push(message);
+        }
+      }
+    }
+  }
+
+  private flushOutput() {
+    if (this.outputBuffer.length > 0) {
+      const messages = this.outputBuffer.splice(0, this.outputBuffer.length);
+      for (const msg of messages) {
+        this.writeDirectly(msg);
+      }
+    }
+  }
+
+  private output(message: string) {
+    // Always use direct write for reliability
+    this.writeDirectly(message);
+  }
+
+  private error(message: string) {
+    this.writeDirectly(message, this.errorFd);
   }
 
   _transform(chunk: any, encoding: string, callback: Function) {
@@ -91,7 +129,7 @@ class ImprovedClaudeStreamParser extends Transform {
       this.buffer += chunk.toString();
       
       const lines = this.buffer.split('\n');
-      this.buffer = lines.pop() || ''; // Keep incomplete line in buffer
+      this.buffer = lines.pop() || '';
       
       for (const line of lines) {
         this.lineCount++;
@@ -100,31 +138,27 @@ class ImprovedClaudeStreamParser extends Transform {
         }
       }
       
-      // Pass through original data for any downstream consumers
-      this.push(chunk);
       callback();
     } catch (error) {
       this.handleError('_transform', error);
-      // Still continue processing
       callback();
     }
   }
 
   _flush(callback: Function) {
     try {
-      // Process any remaining buffer content
       if (this.buffer.trim()) {
         this.processLine(this.buffer);
       }
       
-      // Output final statistics if verbose
+      this.flushOutput();
+      
+      if (this.flushTimer) {
+        clearInterval(this.flushTimer);
+      }
+      
       if (this.verboseErrors && (this.errorCount > 0 || this.lineCount > 100)) {
-        console.error(`[${this.agentName}] Parser Statistics:`, {
-          lines: this.lineCount,
-          success: this.successCount,
-          errors: this.errorCount,
-          errorRate: `${((this.errorCount / this.lineCount) * 100).toFixed(2)}%`
-        });
+        this.output(`[${this.agentName}] Parser Statistics: lines=${this.lineCount}, success=${this.successCount}, errors=${this.errorCount}`);
       }
       
       callback();
@@ -143,13 +177,9 @@ class ImprovedClaudeStreamParser extends Transform {
       this.errorCount++;
       
       if (this.verboseErrors) {
-        console.error(`[${this.agentName}] JSON parse error at line ${this.lineCount}:`, 
-          parseError instanceof Error ? parseError.message : parseError);
-        console.error(`[${this.agentName}] Problematic line (first 200 chars):`, 
-          line.substring(0, 200));
+        this.error(`[${this.agentName}] JSON parse error at line ${this.lineCount}: ${parseError}`);
       }
       
-      // Fallback to raw output if enabled
       if (this.fallbackToRaw) {
         this.outputRawLine(line);
       }
@@ -158,34 +188,29 @@ class ImprovedClaudeStreamParser extends Transform {
 
   private outputRawLine(line: string) {
     try {
-      // Try to extract some useful info even from malformed JSON
       const prefix = `[${this.formatColor(this.agentName, 'bright')}]`;
       
       if (line.includes('"type":"text"')) {
-        // Try to extract text content
         const textMatch = line.match(/"text"\s*:\s*"([^"]*)/);
         if (textMatch) {
-          console.log(`${prefix} ${this.formatColor('[RAW TEXT]', 'yellow')} ${textMatch[1]}`);
+          this.output(`${prefix} ${this.formatColor('[RAW TEXT]', 'yellow')} ${textMatch[1]}`);
           return;
         }
       }
       
       if (line.includes('"type":"tool_use"')) {
-        // Try to extract tool name
         const toolMatch = line.match(/"name"\s*:\s*"([^"]*)/);
         if (toolMatch) {
-          console.log(`${prefix} ${this.formatColor('[RAW TOOL]', 'yellow')} ${toolMatch[1]}`);
+          this.output(`${prefix} ${this.formatColor('[RAW TOOL]', 'yellow')} ${toolMatch[1]}`);
           return;
         }
       }
       
-      // Last resort: show truncated raw line
       const truncated = line.length > 100 ? line.substring(0, 100) + '...' : line;
-      console.log(`${prefix} ${this.formatColor('[RAW]', 'red')} ${truncated}`);
+      this.output(`${prefix} ${this.formatColor('[RAW]', 'red')} ${truncated}`);
     } catch (e) {
-      // Even raw output failed, just continue
       if (this.verboseErrors) {
-        console.error(`[${this.agentName}] Failed to output raw line:`, e);
+        this.error(`[${this.agentName}] Failed to output raw line: ${e}`);
       }
     }
   }
@@ -193,34 +218,26 @@ class ImprovedClaudeStreamParser extends Transform {
   private formatColor(text: string, color: string): string {
     if (!this.useColors) return text;
     const colors: { [key: string]: string } = {
-      reset: '\x1b[0m',
-      bright: '\x1b[1m',
-      dim: '\x1b[2m',
-      red: '\x1b[31m',
-      green: '\x1b[32m',
-      yellow: '\x1b[33m',
-      blue: '\x1b[34m',
-      cyan: '\x1b[36m',
-      gray: '\x1b[90m'
+      'bright': '\x1b[1m',
+      'cyan': '\x1b[36m',
+      'yellow': '\x1b[33m',
+      'green': '\x1b[32m',
+      'red': '\x1b[31m',
+      'gray': '\x1b[90m',
+      'dim': '\x1b[2m',
+      'reset': '\x1b[0m'
     };
-    return `${colors[color] || ''}${text}${colors.reset || ''}`;
-  }
-
-  private formatTimestamp(): string {
-    const now = new Date();
-    const time = now.toTimeString().split(' ')[0];
-    return this.formatColor(time, 'gray');
+    return `${colors[color] || ''}${text}\x1b[0m`;
   }
 
   private truncateOutput(text: string, maxLines: number = 3): string {
     try {
-      // Safely handle various input types
       const safeText = String(text || '');
       const lines = safeText.split('\n');
       
       if (lines.length <= maxLines) return safeText;
       
-      return lines.slice(0, maxLines).join('\n') + 
+      return lines.slice(0, maxLines).join('\n') +
              this.formatColor(`\n... (${lines.length - maxLines} more lines)`, 'dim');
     } catch (e) {
       return this.formatColor('[truncation failed]', 'red');
@@ -241,8 +258,9 @@ class ImprovedClaudeStreamParser extends Transform {
           return input.file_path ? `Editing ${String(input.file_path)}` : 'Editing file...';
         case 'Grep':
           return input.pattern ? `Searching for: ${String(input.pattern).substring(0, 50)}` : 'Searching...';
+        case 'Glob':
+          return JSON.stringify(input).substring(0, 100);
         default:
-          // Safely stringify unknown input
           try {
             const str = JSON.stringify(input);
             return str.substring(0, 100);
@@ -259,17 +277,12 @@ class ImprovedClaudeStreamParser extends Transform {
     try {
       const prefix = `[${this.formatColor(this.agentName, 'bright')}]`;
       
-      // Handle assistant messages
       if (message.type === 'assistant' && message.message?.content) {
         this.processAssistantMessage(prefix, message.message.content);
-      } 
-      // Handle user messages (tool results)
-      else if (message.type === 'user' && message.message?.content) {
+      } else if (message.type === 'user' && message.message?.content) {
         this.processUserMessage(prefix, message.message.content);
-      }
-      // Handle other message types gracefully
-      else if (this.verboseErrors) {
-        console.log(`${prefix} ${this.formatColor('[Unknown message type]', 'yellow')}`, message.type);
+      } else if (this.verboseErrors) {
+        this.output(`${prefix} ${this.formatColor('[Unknown message type]', 'yellow')} ${message.type}`);
       }
     } catch (error) {
       this.handleError('processMessage', error, message);
@@ -280,29 +293,26 @@ class ImprovedClaudeStreamParser extends Transform {
     try {
       if (!Array.isArray(content)) {
         if (this.verboseErrors) {
-          console.error(`${prefix} Warning: content is not an array`);
+          this.error(`${prefix} Warning: content is not an array`);
         }
         return;
       }
-
+      
       for (const item of content) {
         try {
           if (item.type === 'text' && item.text) {
-            // Add spacing after tool results
             if (this.lastWasToolResult) {
-              console.log();
+              this.output('');
               this.lastWasToolResult = false;
             }
             
-            // Safely output text
             const safeText = String(item.text || '').substring(0, this.maxOutputLength);
-            console.log(`${prefix} ${safeText}`);
+            this.output(`${prefix} ${safeText}`);
           } else if (item.type === 'tool_use' && item.id) {
             const toolName = item.name || 'Unknown';
             const toolInfo = this.formatToolInput(toolName, item.input || {});
-            console.log(`${prefix} ${this.formatColor('→', 'cyan')} ${this.formatColor(toolName, 'yellow')}: ${toolInfo}`);
+            this.output(`${prefix} ${this.formatColor('→', 'cyan')} ${this.formatColor(toolName, 'yellow')}: ${toolInfo}`);
             
-            // Store tool info for matching with results
             this.pendingTools.set(item.id, {
               name: toolName,
               input: item.input,
@@ -311,7 +321,7 @@ class ImprovedClaudeStreamParser extends Transform {
           }
         } catch (itemError) {
           if (this.verboseErrors) {
-            console.error(`${prefix} Error processing content item:`, itemError);
+            this.error(`${prefix} Error processing content item: ${itemError}`);
           }
         }
       }
@@ -324,11 +334,11 @@ class ImprovedClaudeStreamParser extends Transform {
     try {
       if (!Array.isArray(content)) {
         if (this.verboseErrors) {
-          console.error(`${prefix} Warning: content is not an array`);
+          this.error(`${prefix} Warning: content is not an array`);
         }
         return;
       }
-
+      
       for (const item of content) {
         try {
           if (item.type === 'tool_result') {
@@ -337,19 +347,18 @@ class ImprovedClaudeStreamParser extends Transform {
             const timeStr = elapsed ? ` ${this.formatColor(`(${elapsed}s)`, 'gray')}` : '';
             
             if (item.is_error) {
-              console.log(`${prefix} ${this.formatColor('✗', 'red')} Tool failed${timeStr}`);
+              this.output(`${prefix} ${this.formatColor('✗', 'red')} Tool failed${timeStr}`);
               const errorPreview = this.truncateOutput(item.content, 2);
               if (errorPreview) {
-                console.log(this.formatColor(`   ${errorPreview.replace(/\n/g, '\n   ')}`, 'red'));
+                this.output(this.formatColor(`   ${errorPreview.replace(/\n/g, '\n   ')}`, 'red'));
               }
             } else {
-              console.log(`${prefix} ${this.formatColor('✓', 'green')} Completed${timeStr}`);
+              this.output(`${prefix} ${this.formatColor('✓', 'green')} Completed${timeStr}`);
               
-              // Show abbreviated output for certain tools
               if (toolInfo && ['Bash', 'Grep'].includes(toolInfo.name) && item.content) {
                 const preview = this.truncateOutput(item.content, 3);
                 if (preview && preview.trim()) {
-                  console.log(this.formatColor(`   ${preview.replace(/\n/g, '\n   ')}`, 'dim'));
+                  this.output(this.formatColor(`   ${preview.replace(/\n/g, '\n   ')}`, 'dim'));
                 }
               }
             }
@@ -359,7 +368,7 @@ class ImprovedClaudeStreamParser extends Transform {
           }
         } catch (itemError) {
           if (this.verboseErrors) {
-            console.error(`${prefix} Error processing tool result:`, itemError);
+            this.error(`${prefix} Error processing tool result: ${itemError}`);
           }
         }
       }
@@ -372,32 +381,39 @@ class ImprovedClaudeStreamParser extends Transform {
     this.errorCount++;
     
     if (this.verboseErrors) {
-      console.error(`[${this.agentName}] Error in ${context}:`, 
-        error instanceof Error ? error.message : error);
+      this.error(`[${this.agentName}] Error in ${context}: ${error instanceof Error ? error.message : error}`);
       
       if (data) {
-        console.error(`[${this.agentName}] Related data:`, 
-          JSON.stringify(data).substring(0, 300));
+        this.error(`[${this.agentName}] Related data: ${JSON.stringify(data).substring(0, 300)}`);
       }
     }
     
-    // Emit error event for monitoring
     this.emit('parser-error', { context, error, data });
   }
 
-  // Public method to get statistics
   public getStatistics() {
     return {
       lines: this.lineCount,
       success: this.successCount,
       errors: this.errorCount,
       errorRate: this.lineCount > 0 ? (this.errorCount / this.lineCount) * 100 : 0,
-      pendingTools: this.pendingTools.size
+      pendingTools: this.pendingTools.size,
+      bufferedOutput: this.outputBuffer.length
     };
+  }
+
+  public destroy(error?: Error) {
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer);
+      this.flushTimer = null;
+    }
+    this.flushOutput();
+    super.destroy(error);
+    return this;
   }
 }
 
-// CLI usage: node parser-improved.js [agent-name] [options]
+// CLI usage
 if (require.main === module) {
   const args = process.argv.slice(2);
   const agentName = args[0] || 'Agent';
@@ -411,7 +427,7 @@ if (require.main === module) {
   
   if (args.includes('--help') || args.includes('-h')) {
     console.log(`
-Usage: node parser-improved.js [agent-name] [options]
+Usage: node parser-v2.js [agent-name] [options]
 
 Options:
   --verbose, -v     Show detailed error information
@@ -424,16 +440,16 @@ The parser reads JSON stream from stdin and outputs formatted messages to stdout
     process.exit(0);
   }
   
-  const parser = new ImprovedClaudeStreamParser(options);
+  const parser = new BulletproofParser(options);
   
-  // Handle process termination
   process.on('SIGINT', () => {
     const stats = parser.getStatistics();
     console.error(`\n[${agentName}] Interrupted. Statistics:`, stats);
+    parser.destroy();
     process.exit(0);
   });
   
-  process.stdin.pipe(parser).pipe(process.stdout);
+  process.stdin.pipe(parser);
 }
 
-export { ImprovedClaudeStreamParser, ParserOptions };
+export default BulletproofParser;

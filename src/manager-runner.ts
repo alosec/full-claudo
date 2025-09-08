@@ -3,54 +3,48 @@
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, mkdirSync, createWriteStream } from 'fs';
 import * as path from 'path';
-import { ImprovedClaudeStreamParser } from './parser-improved';
+import { BulletproofParser } from './parser-v2';
 
 // Run Manager Claude within container with streaming output
 function runManager() {
-  // Read prompt from container's installed location
-  const promptPath = path.join('/usr/local/lib/claudo', 'prompts', 'manager.md');
-  const managerPrompt = readFileSync(promptPath, 'utf8');
+  const workDir = '/workspace';
+  const claudoDir = path.join(workDir, '.claudo');
+  const managerSystemPrompt = path.join(workDir, 'prompts', 'manager-system.md');
   
   // Ensure .claudo directory exists
-  const claudoDir = path.join(process.cwd(), '.claudo');
-  mkdirSync(claudoDir, { recursive: true });
+  try {
+    mkdirSync(claudoDir, { recursive: true });
+  } catch (e) {}
   
-  // Ensure planning directories exist
-  const planningDir = path.join(process.cwd(), 'planning');
-  const tasksDir = path.join(planningDir, 'tasks');
-  const featuresDir = path.join(planningDir, 'features');
-  const inboxDir = path.join(planningDir, 'inbox');
-  const doneDir = path.join(planningDir, 'done');
-  const workLogDir = path.join(process.cwd(), 'work-log');
+  // Prepare the prompt
+  const systemPrompt = readFileSync(managerSystemPrompt, 'utf-8');
+  const taskPrompt = 'Act as Manager Claude and coordinate the work.';
+  const fullPrompt = `${taskPrompt}\n\n---\n\n${systemPrompt}`;
   
-  mkdirSync(tasksDir, { recursive: true });
-  mkdirSync(featuresDir, { recursive: true });
-  mkdirSync(inboxDir, { recursive: true });
-  mkdirSync(doneDir, { recursive: true });
-  mkdirSync(workLogDir, { recursive: true });
+  // Save prompt for debugging
+  const promptFile = path.join(claudoDir, 'manager-prompt.txt');
+  writeFileSync(promptFile, fullPrompt);
+  console.log('[claudo] DEBUG: Prompt file saved to:', promptFile);
+  console.log('[claudo] DEBUG: Prompt length:', fullPrompt.length);
   
-  // Write prompt to temporary file
-  const tempPromptFile = path.join(claudoDir, 'manager-prompt.txt');
-  writeFileSync(tempPromptFile, managerPrompt);
-  
-  console.log('[claudo] Starting Manager with streaming JSON bus...');
-  console.log('[claudo] DEBUG: Prompt file saved to:', tempPromptFile);
-  console.log('[claudo] DEBUG: Prompt length:', managerPrompt.length);
-  
-  // Use cat to read the file and pipe to claude - avoids shell expansion issues
-  const fullCommand = `cat "${tempPromptFile}" | claude --dangerously-skip-permissions --output-format stream-json --input-format text --verbose --model sonnet`;
+  // Build the command to pipe prompt to claude
+  const command = `cat "${promptFile}" | claude --dangerously-skip-permissions --output-format stream-json --input-format text --verbose --model sonnet`;
   
   console.log('[claudo] DEBUG: Executing command via bash -c');
-  console.log('[claudo] DEBUG: Command:', fullCommand);
+  console.log('[claudo] DEBUG: Command:', command);
   
-  // Spawn Claude Manager process
-  const manager = spawn('bash', ['-c', fullCommand], {
-    stdio: ['pipe', 'pipe', 'inherit'],
-    cwd: process.cwd()
+  // Spawn the command in container context
+  const manager = spawn('bash', ['-c', command], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: {
+      ...process.env,
+      CLAUDE_OUTPUT_FORMAT: 'stream-json',
+      NODE_ENV: 'production'
+    }
   });
   
-  // Set up stream parsing for human-readable output
-  const parser = new ImprovedClaudeStreamParser({
+  // Set up stream parsing with bulletproof output
+  const parser = new BulletproofParser({
     agentName: 'Manager',
     verboseErrors: true,
     fallbackToRaw: true,
@@ -62,13 +56,9 @@ function runManager() {
   const debugStream = createWriteStream(debugLogPath, { flags: 'a' });
   console.log('[claudo] DEBUG: Raw JSON will be logged to', debugLogPath);
   
-  // Tee the output: send to both parser AND debug file
-  manager.stdout.on('data', (chunk) => {
-    // Write raw data to debug file
-    debugStream.write(chunk);
-    // Also send to parser
-    parser.write(chunk);
-  });
+  // Pipe stdout through parser and also to debug file
+  manager.stdout.pipe(parser);
+  manager.stdout.pipe(debugStream);
   
   // Add error handling for parser
   parser.on('error', (error) => {
@@ -76,27 +66,47 @@ function runManager() {
     console.error('[claudo] Check', debugLogPath, 'for raw output');
   });
   
+  parser.on('parser-error', (details) => {
+    if (details.context === '_transform') {
+      console.error('[claudo] Transform error, continuing...', details.error.message);
+    }
+  });
+  
   // Handle process events
   manager.on('error', (error) => {
     console.error('[claudo] Manager error:', error);
-    process.exit(1);
+  });
+  
+  manager.stderr.on('data', (data) => {
+    console.error('[claudo] Manager stderr:', data.toString());
   });
   
   manager.on('close', (code) => {
-    console.log(`[claudo] Manager exited with code ${code}`);
-    process.exit(code || 0);
+    console.log(`[claudo] Manager process exited with code ${code}`);
+    debugStream.end();
+    parser.destroy();
   });
   
-  // Handle graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('[claudo] Shutting down Manager...');
-    manager.kill('SIGTERM');
-  });
-  
+  // Handle container termination
   process.on('SIGINT', () => {
-    console.log('[claudo] Shutting down Manager...');
-    manager.kill('SIGINT');
+    console.log('[claudo] Stopping Manager...');
+    const stats = parser.getStatistics();
+    console.log('[claudo] Parser statistics:', stats);
+    manager.kill('SIGTERM');
+    setTimeout(() => {
+      manager.kill('SIGKILL');
+      process.exit(0);
+    }, 5000);
+  });
+  
+  process.on('SIGTERM', () => {
+    console.log('[claudo] Terminating Manager...');
+    manager.kill('SIGTERM');
   });
 }
 
-runManager();
+// Check if run directly or imported
+if (require.main === module) {
+  console.log('[claudo] Starting Manager with streaming JSON bus...');
+  runManager();
+}

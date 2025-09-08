@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/alex/.claude/agents/**)",
+      "WebFetch(domain:alexgarcia.blog)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
