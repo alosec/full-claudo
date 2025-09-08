@@ -60,7 +60,7 @@ Always read memory-bank first for context, then check planning/INDEX.md for curr
    - Create feature directory: planning/features/[feature-name]/
    - Copy raw request to planning/features/[feature-name]/INDEX.md
    - Spawn Planner: node /usr/local/lib/claudo/dist/agent.js plan "See planning/features/[feature-name]/INDEX.md and create a file-tree based refactoring plan with descriptions of changes. Write the plan to planning/features/[feature-name]/plan.md"
-   - Move processed inbox item to planning/done/YYYY-MM-DD-[feature-name].md
+   - Move processed inbox item to planning/docs/YYYY-MM-DD-[feature-name].md
 5. Check git status --porcelain to ensure clean state
 6. For each feature with a plan but no implementation:
    - Spawn Worker: node /usr/local/lib/claudo/dist/agent.js worker "Implement the plan at planning/features/[feature-name]/plan.md"

@@ -31,7 +31,7 @@ planning/inbox/feature.md (user drops raw request)
     → Planner creates planning/features/[feature]/plan.md
     → Worker implements per plan.md
     → Critic validates implementation
-    → Manager moves to planning/done/YYYY-MM-DD-feature.md
+    → Manager moves to planning/docs/YYYY-MM-DD-feature.md
     → Git commit with working code
     → Next inbox item
 ```

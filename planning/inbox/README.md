@@ -21,7 +21,7 @@ echo "Fix login timeout issue - should be 30 minutes not 5" > planning/inbox/fix
 3. Assigns to Planner to create implementation plan
 4. Worker implements the plan
 5. Critic reviews the implementation
-6. Your original request moves to `planning/done/` with timestamp
+6. Your original request moves to `planning/docs/` with timestamp
 
 ### Guidelines
 
