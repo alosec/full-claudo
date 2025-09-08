@@ -161,17 +161,9 @@ export class ClaudeStreamParser extends Transform {
           }
         }
         
-        // Handle backpressure - don't push if downstream is backed up
-        if (!this.push(chunk)) {
-          // Downstream is backed up, pause until it's ready
-          console.error(`[${this.agentName}] Backpressure detected, pausing...`);
-          this.once('drain', () => {
-            console.error(`[${this.agentName}] Resuming after backpressure`);
-            callback();
-          });
-        } else {
-          callback();
-        }
+        // Don't push anything downstream - we're outputting directly via console.log
+        // Just call the callback to signal we're ready for more data
+        callback();
       } catch (e) {
         // Enhanced verbose transform errors for debugging
         this.outputError(`[${this.agentName}] Transform error at line ${this.lineCount}: ${e instanceof Error ? e.message : e}`);
@@ -311,7 +303,8 @@ if (require.main === module) {
     console.error(`[${agentName}] stdin error:`, err.message);
   });
   
-  process.stdin.pipe(parser).pipe(process.stdout);
+  // Parser outputs directly via console.log, no need to pipe to stdout
+  process.stdin.pipe(parser);
 }
 
 export default ClaudeStreamParser;

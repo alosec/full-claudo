@@ -64,15 +64,12 @@ export class HostDockerParser {
           console.error(`[claudo-debug] Received ${chunk.length} bytes from tail (total: ${this.bytesRead})`);
         });
         
-        // Add error handling to the pipe
+        // Pipe to parser only (parser outputs directly via console.log)
         this.tailProcess.stdout
           .on('error', (err) => {
             console.error('[claudo] Tail stdout error:', err.message);
           })
-          .pipe(this.parser)
-          .on('error', (err) => {
-            console.error('[claudo] Parser pipe error:', err.message);
-          });
+          .pipe(this.parser);
       }
 
       // Handle errors
