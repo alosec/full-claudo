@@ -3,7 +3,7 @@
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, mkdirSync, createWriteStream } from 'fs';
 import * as path from 'path';
-import { ClaudeStreamParser } from './parser';
+import { ImprovedClaudeStreamParser } from './parser-improved';
 
 // Run Manager Claude within container with streaming output
 function runManager() {
@@ -50,7 +50,12 @@ function runManager() {
   });
   
   // Set up stream parsing for human-readable output
-  const parser = new ClaudeStreamParser('Manager');
+  const parser = new ImprovedClaudeStreamParser({
+    agentName: 'Manager',
+    verboseErrors: true,
+    fallbackToRaw: true,
+    useColors: true
+  });
   
   // Set up debug logging to capture raw JSON
   const debugLogPath = path.join(claudoDir, 'manager-debug.jsonl');

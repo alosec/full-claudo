@@ -11,7 +11,11 @@
     "start": "npm run build && claudo up",
     "stop": "claudo down",
     "logs": "claudo logs",
-    "postinstall": "npm run build"
+    "postinstall": "npm run build",
+    "test:parser": "npm run build && node dist/test/parser.test.js",
+    "test:manager": "npm run build && node dist/src/test-manager.js",
+    "test:complex": "npm run build && node dist/src/test-manager-complex.js",
+    "test": "npm run test:parser"
   },
   "keywords": ["claude", "multi-agent", "automation"],
   "author": "Alex",
