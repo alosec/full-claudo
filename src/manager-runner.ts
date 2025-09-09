@@ -56,14 +56,16 @@ function runManager() {
     console.log('[claudo] You can reference it in your conversation.\n');
     
     // Use script to provide PTY, start Claude without initial prompt
-    command = `script -e -q -c "claude --dangerously-skip-permissions --model sonnet" /dev/null`;
+    // Export HOME to ensure Claude finds credentials
+    command = `script -e -q -c "HOME=/home/node claude --dangerously-skip-permissions --model sonnet" /dev/null`;
     
     spawnOptions = {
       stdio: 'inherit',  // Direct terminal I/O for interactive mode
       env: {
         ...process.env,
         NODE_ENV: 'production',
-        TERM: 'xterm-256color'  // Ensure proper terminal type
+        TERM: 'xterm-256color',  // Ensure proper terminal type
+        HOME: '/home/node'  // Ensure Claude finds credentials in the right location
       }
     };
   } else {
