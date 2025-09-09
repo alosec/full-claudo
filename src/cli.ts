@@ -10,6 +10,7 @@ interface ParsedArgs {
   command: string;
   promptFile?: string;
   executionMode?: ExecutionContext;
+  interactive?: boolean;
   remainingArgs: string[];
 }
 
@@ -33,6 +34,8 @@ function parseArgs(): ParsedArgs {
       result.executionMode = ExecutionContext.DOCKER;
     } else if (arg === '--native' || arg === '--host') {
       result.executionMode = ExecutionContext.NATIVE;
+    } else if (arg === '-it' || arg === '--interactive') {
+      result.interactive = true;
     } else {
       result.remainingArgs.push(arg);
     }
@@ -41,13 +44,18 @@ function parseArgs(): ParsedArgs {
   return result;
 }
 
-const { command, promptFile, executionMode, remainingArgs: args } = parseArgs();
+const { command, promptFile, executionMode, interactive, remainingArgs: args } = parseArgs();
 
 const scriptPath = (script: string) => join(__dirname, script);
 
 switch (command) {
   case 'up':
-    console.log('[claudo] Starting Manager...');
+    if (interactive) {
+      console.log('[claudo] Starting Manager in interactive mode...');
+      process.env.CLAUDO_INTERACTIVE = 'true';
+    } else {
+      console.log('[claudo] Starting Manager...');
+    }
     require(scriptPath('up'));
     break;
 
@@ -137,6 +145,7 @@ Usage: claudo <command> [options]
 
 Commands:
   up           Start the Manager container (auto-builds if needed)
+  up -it       Start Manager in interactive mode for debugging
   down         Stop the Manager container
   build        Build the Docker image if missing
   rebuild      Force rebuild the Docker image

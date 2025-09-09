@@ -10,6 +10,7 @@ import { ensureDockerAvailable, getContainerStatus, removeContainer } from './ut
 // Spawn Manager Claude in Docker container - with auto-build support
 async function spawnManager() {
   const containerName = 'claudo-manager';
+  const isInteractive = process.env.CLAUDO_INTERACTIVE === 'true';
   
   // Ensure Docker is available
   if (!ensureDockerAvailable()) {
@@ -42,36 +43,66 @@ async function spawnManager() {
   const claudoDir = path.join(process.cwd(), '.claudo');
   mkdirSync(claudoDir, { recursive: true });
   
-  // Always use detached mode - simple approach
-  const cmd = `docker run -d --name ${containerName} \
-    -v "$(pwd):/workspace" \
-    -v "$HOME/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro" \
-    -v "$HOME/.claude/settings.json:/home/node/.claude/settings.json:ro" \
-    -w /workspace \
-    claudo-container \
-    node /workspace/dist/src/manager-runner.js`;
-  
-  console.log('[claudo] Starting Manager in detached mode...');
-  
-  try {
-    // Start container in detached mode
-    const containerId = execSync(cmd, { encoding: 'utf-8', cwd: process.cwd() }).trim();
-    console.log(`[claudo] Manager started (${containerId.substring(0, 12)}).`);
+  if (isInteractive) {
+    // Interactive mode: Run with -it for direct Claude Code session
+    const cmd = `docker run -it --rm --name ${containerName} \
+      -v "$(pwd):/workspace" \
+      -v "$HOME/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro" \
+      -v "$HOME/.claude/settings.json:/home/node/.claude/settings.json:ro" \
+      -w /workspace \
+      -e CLAUDO_INTERACTIVE=true \
+      claudo-container \
+      node /workspace/dist/src/manager-runner.js`;
     
-    // Wait a moment for container to start
-    console.log('[claudo] Waiting for container to start...\n');
-    setTimeout(() => {
-      // Start host-based parser to show live output
-      const parser = new HostDockerParser(process.cwd(), 'Manager');
-      parser.start().catch((error) => {
-        console.error('[claudo] Parser failed:', error.message);
-        console.log('[claudo] Use "claudo logs" to view output manually.');
+    console.log('[claudo] Starting interactive Manager session...');
+    console.log('[claudo] You will have direct Claude Code access to the Manager.');
+    console.log('[claudo] Press Ctrl+C to exit.\n');
+    
+    try {
+      // Run interactively - this will attach to current terminal
+      execSync(cmd, { 
+        stdio: 'inherit',
+        cwd: process.cwd() 
       });
-    }, 2000);
+    } catch (error: any) {
+      // Ctrl+C or exit is normal, only report real errors
+      if (error.status !== 130 && error.status !== 0) {
+        console.error('[claudo] Error in interactive session:', error.message);
+        process.exit(1);
+      }
+    }
+  } else {
+    // Normal detached mode
+    const cmd = `docker run -d --name ${containerName} \
+      -v "$(pwd):/workspace" \
+      -v "$HOME/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro" \
+      -v "$HOME/.claude/settings.json:/home/node/.claude/settings.json:ro" \
+      -w /workspace \
+      claudo-container \
+      node /workspace/dist/src/manager-runner.js`;
     
-  } catch (error: any) {
-    console.error('[claudo] Error starting manager:', error.message);
-    process.exit(1);
+    console.log('[claudo] Starting Manager in detached mode...');
+    
+    try {
+      // Start container in detached mode
+      const containerId = execSync(cmd, { encoding: 'utf-8', cwd: process.cwd() }).trim();
+      console.log(`[claudo] Manager started (${containerId.substring(0, 12)}).`);
+      
+      // Wait a moment for container to start
+      console.log('[claudo] Waiting for container to start...\n');
+      setTimeout(() => {
+        // Start host-based parser to show live output
+        const parser = new HostDockerParser(process.cwd(), 'Manager');
+        parser.start().catch((error) => {
+          console.error('[claudo] Parser failed:', error.message);
+          console.log('[claudo] Use "claudo logs" to view output manually.');
+        });
+      }, 2000);
+      
+    } catch (error: any) {
+      console.error('[claudo] Error starting manager:', error.message);
+      process.exit(1);
+    }
   }
 }
 

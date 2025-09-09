@@ -1,7 +1,7 @@
 # Active Context
 
 ## Current Phase
-🚨 TOP PRIORITY: Subagent outputs are invisible - Worker/Planner/Critic/Oracle run but their streaming JSON is not visible (2025-09-09)
+🔄 STRATEGIC PIVOT: Interactive Manager Mode for Direct Debugging (2025-09-09)
 
 ## Latest Updates: Custom Prompt File Support
 Successfully implemented `--prompt-file` functionality for agent commands:
@@ -34,83 +34,59 @@ Successfully implemented `--prompt-file` functionality for agent commands:
 ✅ **Manager spawning working**: Manager can spawn agents using `node dist/src/agent.js plan "task"`
 ✅ **Critical solution found**: Direct node calls bypass claudo routing and work perfectly in container
 
-## 🚨 CRITICAL: Subagent Visibility Gap
+## Interactive Manager Mode - IMPLEMENTED (2025-09-09)
 
-**Current Reality vs Desired UX:**
-- **Working**: Manager → Planner → Worker → Critic orchestration ✅
-- **BROKEN**: Subagent activities are completely invisible to users ❌
+### Problem Solved
+Previous attempts at subagent visibility were too complex:
+- Session file monitoring had timing issues
+- Log multiplexing was fragile
+- JSON stream parsing created context pollution
 
-### The Visibility Problem:
-```
-Current (BROKEN):
-[Manager] → Bash: $ node dist/src/agent.js plan "task"
-[Manager] ... (166 seconds of silence)
-[Manager] ✓ Completed
+### Solution: Interactive Manager (`claudo up -it`)
+Implemented a simpler, more powerful approach:
 
-Desired:
-[Manager] → Bash: $ node dist/src/agent.js plan "task" 
-[Planner] → Read: Reading project files...
-[Planner] → Write: Creating task structure...
-[Planner] → Bash: Running validation...
-[Planner] Final response: "Task created successfully"
-[Manager] ✓ Completed
-```
+#### What It Does
+- Launches Manager as interactive Claude Code session
+- Runs Docker container with `-it` flag for terminal attachment
+- Bypasses JSON streaming in favor of direct Claude interface
+- Provides full visibility into Manager's tool use and subagent calls
 
-### Why This Is TOP PRIORITY:
-1. **Worker is working blind** - No visibility into what it's doing
-2. **Planner created tasks invisibly** - User can't see the planning process
-3. **Critic reviewed silently** - No insight into review process
-4. **Debug impossible** - When agents fail, no way to see why
-5. **Trust issues** - Users can't trust what they can't see
+#### How to Use
+```bash
+# Start interactive Manager
+claudo up -it
 
-### Technical Requirements:
-1. **Session ID Capture**: Extract session ID when Manager spawns agent
-2. **Log File Discovery**: Find agent's ~/.claude/projects/*/[session].jsonl
-3. **Stream Parser Integration**: Pipe agent logs through ClaudeStreamParser
-4. **Output Multiplexing**: Show both Manager and subagent streams in `claudo logs -f`
-5. **Real-time Updates**: Stream must show activity as it happens, not after completion
-
-This architecture ensures observability without context pollution - users get full visibility while Manager maintains focused context.
-
-## Escaping Issues - Recurring Theme
-**Escaping problems have been a consistent challenge throughout this project:**
-1. Shell escaping in prompts (backticks in markdown)
-2. JSON escaping in tool parameters
-3. Now: Mixed stdout streams (debug text + JSON)
-
-## Current Architecture Status
-
-### After Simplification Attempt
-- ✅ Created `host-parser.ts` to run parser on host (where console.log works)
-- ✅ Manager outputs to docker logs
-- ❌ BUT: Docker logs contains both debug output AND JSON stream mixed together
-- ❌ Parser can't distinguish between debug messages and actual JSON
-
-### The Data Flow Problem
-1. Manager process outputs debug messages to stdout/stderr
-2. Claude CLI outputs JSON stream to stdout
-3. Docker logs combines everything
-4. Parser receives mixed stream and fails to parse debug lines
-
-## Reliable Data Source
-**`.claudo/manager-debug.jsonl` captures ONLY the JSON stream** - this file is clean and parseable.
-
-## Potential Solutions
-
-### Option 1: Read from Debug File (Most Reliable)
-```javascript
-// Instead of docker logs, read the clean JSON file
-tail -f .claudo/manager-debug.jsonl | parser
+# In the Manager session, spawn subagents:
+# Use Bash tool: node dist/src/agent.js plan "task"
+# Use Bash tool: node dist/src/agent.js worker "implement feature"
 ```
 
-### Option 2: Separate Debug Output
-- Send debug messages to stderr only
-- Keep stdout clean for JSON stream
-- Docker logs can then filter: `docker logs claudo-manager 2>/dev/null`
+#### Implementation Details
+1. **CLI** (`src/cli.ts`): Added `-it` flag parsing, sets `CLAUDO_INTERACTIVE` env var
+2. **Up Command** (`src/up.ts`): Detects interactive mode, uses `docker run -it --rm` instead of `-d`
+3. **Manager Runner** (`src/manager-runner.ts`): Switches between JSON streaming (normal) and direct Claude (interactive)
 
-### Option 3: Prefix Filtering
-- Add unique prefix to JSON lines
-- Filter in parser: only parse lines starting with prefix
+#### Benefits Achieved
+- ✅ Direct visibility into Manager operations
+- ✅ Real-time debugging of subagent spawning
+- ✅ No complex log parsing needed
+- ✅ Native Claude Code interface with full tool visibility
+- ✅ Can manually test and debug agent coordination
+
+## Previous Attempts Summary
+
+### Subagent Visibility Attempts
+1. **Session ID extraction from verbose mode** - Verbose doesn't output session ID without stream-json
+2. **Stream-JSON parsing** - Works but creates context pollution for Manager
+3. **Log file monitoring** - Session files created but real-time tailing complex
+4. **Standalone logs mode** - Implemented but monitoring not detecting sessions properly
+
+### Complexity Issues Encountered
+- Shell escaping in prompts (backticks in markdown)
+- JSON escaping in tool parameters
+- Mixed stdout streams (debug text + JSON)
+- Session file discovery timing issues
+- Parser synchronization problems
 
 ## System Status
 - ✅ **Manager Function**: Works correctly, processes tasks, reads memory-bank
