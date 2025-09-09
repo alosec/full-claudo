@@ -1,7 +1,7 @@
 # Active Context
 
 ## Current Phase
-✅ LATEST SUCCESS: Full custom prompt support working in both native and Docker (2025-09-09)
+🚨 TOP PRIORITY: Subagent outputs are invisible - Worker/Planner/Critic/Oracle run but their streaming JSON is not visible (2025-09-09)
 
 ## Latest Updates: Custom Prompt File Support
 Successfully implemented `--prompt-file` functionality for agent commands:
@@ -30,36 +30,45 @@ Successfully implemented `--prompt-file` functionality for agent commands:
    - Context resolution with user override support
 
 ### Result:
-✅ **Custom prompts work in both contexts**: `claudo plan --prompt-file=./custom.md "task"` works on host and in Docker
-✅ **Container claudo command fixed**: Dockerfile updated to copy and configure claudo properly
+✅ **Custom prompts work from HOST**: `claudo plan --prompt-file=./custom.md "task"` works when called from host
+✅ **Manager spawning working**: Manager can spawn agents using `node dist/src/agent.js plan "task"`
+✅ **Critical solution found**: Direct node calls bypass claudo routing and work perfectly in container
 
-## Critical Architecture Pattern - Agent Output Streaming
+## 🚨 CRITICAL: Subagent Visibility Gap
 
-**The Manager-Agent communication flow is designed with intentional separation:**
+**Current Reality vs Desired UX:**
+- **Working**: Manager → Planner → Worker → Critic orchestration ✅
+- **BROKEN**: Subagent activities are completely invisible to users ❌
 
-### Desired UX Flow:
+### The Visibility Problem:
 ```
-[Manager] → Bash: $ claudo plan "analyze requirements"
-[Planner] → Read: Reading project files...  
-[Planner] → Bash: Running analysis...
-[Planner] ... (streaming JSON activity visible via logs)
-[Planner] Final response: "Here's the plan..."
-[Manager] Excellent! The planner suggests: [processes response]
+Current (BROKEN):
+[Manager] → Bash: $ node dist/src/agent.js plan "task"
+[Manager] ... (166 seconds of silence)
+[Manager] ✓ Completed
+
+Desired:
+[Manager] → Bash: $ node dist/src/agent.js plan "task" 
+[Planner] → Read: Reading project files...
+[Planner] → Write: Creating task structure...
+[Planner] → Bash: Running validation...
+[Planner] Final response: "Task created successfully"
+[Manager] ✓ Completed
 ```
 
-### Key Design Principles:
-1. **Session Capture**: When Manager spawns agent, capture the session ID from stderr
-2. **Log Tailing**: Monitor `~/.claude/projects/` inside container for session logs
-3. **Stream Integration**: Pipe session logs into Docker container output stream
-4. **User Visibility**: `claudo logs -f` shows full readable streaming output from subagents
-5. **Context Isolation**: Manager receives ONLY final text response, NOT streaming JSON
-6. **Clean Separation**: User sees everything, Manager context stays clean
+### Why This Is TOP PRIORITY:
+1. **Worker is working blind** - No visibility into what it's doing
+2. **Planner created tasks invisibly** - User can't see the planning process
+3. **Critic reviewed silently** - No insight into review process
+4. **Debug impossible** - When agents fail, no way to see why
+5. **Trust issues** - Users can't trust what they can't see
 
-### Implementation Status:
-- ✅ Session ID capture logic exists in agent.ts
-- ✅ Log monitoring logic exists in logs.ts  
-- ❌ **Missing**: Integration to pipe subagent logs into container output stream
-- ❌ **Missing**: Manager not capturing/displaying agent responses properly
+### Technical Requirements:
+1. **Session ID Capture**: Extract session ID when Manager spawns agent
+2. **Log File Discovery**: Find agent's ~/.claude/projects/*/[session].jsonl
+3. **Stream Parser Integration**: Pipe agent logs through ClaudeStreamParser
+4. **Output Multiplexing**: Show both Manager and subagent streams in `claudo logs -f`
+5. **Real-time Updates**: Stream must show activity as it happens, not after completion
 
 This architecture ensures observability without context pollution - users get full visibility while Manager maintains focused context.
 
@@ -105,14 +114,14 @@ tail -f .claudo/manager-debug.jsonl | parser
 
 ## System Status
 - ✅ **Manager Function**: Works correctly, processes tasks, reads memory-bank
-- ✅ **Agent Spawning**: Works in both native and Docker contexts
-- ✅ **Custom Prompts**: Full support for --prompt-file with path resolution
+- ✅ **Agent Spawning from Manager**: WORKING - Manager spawns agents using `node dist/src/agent.js [type] "task"`
+- ✅ **Custom Prompts from Host**: --prompt-file works when called directly from host
 - ✅ **Execution Context**: Automatic detection of Docker vs native environment
 - ✅ **Session Monitoring**: Session ID capture implemented
 - ✅ **Clean Communication**: Text responses via stdin, no shell expansion issues
-- ✅ **Docker claudo**: Command available and working in container
-- ❌ **Response Capture**: Manager not properly displaying agent responses
-- ❌ **Log Integration**: Subagent logs not piped to container output stream
+- ✅ **Direct Node Execution**: Agents work perfectly when called directly with node
+- ✅ **Response Capture**: Manager receives clean text responses from agents
+- ✅ **Multi-Agent Orchestration**: Full Manager → Planner → Worker → Critic flow confirmed working
 
 ## Key Files
 - `src/host-parser.ts` - Host-based parser reading docker logs

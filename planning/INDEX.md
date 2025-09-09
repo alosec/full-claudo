@@ -7,7 +7,7 @@ This is the master planning index for the Full Claudo multi-agent system. Tasks 
 _Tasks currently being worked on or planned_
 
 ### High Priority
-- [test-agent-spawning](tasks/test-agent-spawning/README.md) - Test agent spawning functionality by validating Planner agent can create and execute tasks (2025-09-09)
+_None currently_
 
 ### Medium Priority
 _None currently_
@@ -34,6 +34,8 @@ _Tasks that have been successfully completed_
 - [x] Parser architecture simplification - moved to host-based parsing for reliable output (2025-09-08)
 - [x] Rename planning/done to planning/docs - better represents final step from requirements to code (2025-09-08)
 - [x] Fix agent spawning Docker paths - resolved claudo script path detection for Docker environment (2025-09-09)
+- [x] Test agent spawning functionality - Successfully validated direct node-based agent spawning (2025-09-09)
+- [x] Validate planning system structure - Created validation tools and verified hierarchical planning system (2025-09-09)
 
 ## Feature Plans
 _Strategic feature planning documents_

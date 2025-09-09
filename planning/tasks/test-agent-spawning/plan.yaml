@@ -1,0 +1,85 @@
+task: "Test Agent Spawning Functionality - Validate Planner Agent Task Creation"
+priority: high
+estimated_effort: "2-3 hours"
+dependencies: ["memory-bank files readable", "planning system structure", "claudo command available"]
+
+analysis:
+  current_state: |
+    - Full Claudo multi-agent system is implemented (~100 lines TypeScript)
+    - Manager agent successfully reads memory-bank for context
+    - Planning hierarchy structure is established in planning/tasks/
+    - Agent spawning system exists but has critical blocker
+    - Custom prompt support implemented but Manager cannot spawn agents from container
+    
+  requirements: |
+    - Validate Planner agent can read and understand memory-bank context
+    - Test hierarchical task creation following established structure
+    - Verify README.md formatting follows project standards  
+    - Confirm planning/INDEX.md integration works correctly
+    - Demonstrate complete planning workflow from analysis to task creation
+    
+  approach: |
+    Create a concrete test scenario where the Planner agent must:
+    1. Analyze memory-bank to understand project context
+    2. Create a new task directory with proper hierarchical structure
+    3. Write comprehensive README.md following format standards
+    4. Update planning/INDEX.md to reflect the new task
+    5. Demonstrate understanding of the agent architecture and current blockers
+
+implementation_steps:
+  - step: "Define test scenario - create example development task"
+    files: ["planning/tasks/test-agent-spawning/test-scenario.md"]
+    type: "create" 
+    description: "Create a concrete task scenario for the Planner to work on"
+    
+  - step: "Execute test - run Planner agent with test scenario"
+    files: [".claudo/test-session.txt"]
+    type: "create"
+    description: "Use claudo plan command to spawn Planner and capture session"
+    
+  - step: "Validate memory-bank context understanding"
+    files: ["planning/tasks/test-agent-spawning/context-validation.md"]
+    type: "create"
+    description: "Document evidence that Planner understood project context"
+    
+  - step: "Verify task structure creation"
+    files: ["planning/tasks/[new-task-created-by-planner]/README.md"]
+    type: "validate"
+    description: "Confirm Planner created proper task directory and README"
+    
+  - step: "Check planning/INDEX.md integration" 
+    files: ["planning/INDEX.md"]
+    type: "modify"
+    description: "Verify Planner correctly updated INDEX.md with new task"
+    
+  - step: "Document test results and findings"
+    files: ["planning/tasks/test-agent-spawning/test-results.md"]
+    type: "create"
+    description: "Create comprehensive report of test outcomes"
+
+testing_strategy:
+  - "Manual verification of each acceptance criterion"
+  - "Cross-reference created task against existing task examples"
+  - "Validate README.md format matches established templates"
+  - "Check planning/INDEX.md for proper task registration"
+  - "Verify evidence of memory-bank context comprehension"
+
+completion_criteria:
+  - "Planner agent successfully spawned via claudo plan command"
+  - "New task directory created following hierarchical naming conventions"
+  - "README.md contains all required sections in proper format"
+  - "planning/INDEX.md updated to include new task"
+  - "Documentation shows clear understanding of Full Claudo architecture"
+  - "Test demonstrates that Planner agent can analyze and create tasks autonomously"
+
+blockers:
+  - "Critical issue: Manager agent cannot spawn subagents with custom prompts from container"
+  - "Agent spawning from Docker container fails - may need host-based testing"
+  - "If claudo command not available in current context, test may need adaptation"
+
+success_metrics:
+  - "Task creation follows exact format specified in planning/tasks/README.md"
+  - "Evidence of memory-bank analysis in task documentation"
+  - "Proper hierarchical directory structure maintained"
+  - "INDEX.md integration seamless and correct"
+  - "Agent demonstrates full understanding of project context and patterns"
