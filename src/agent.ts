@@ -1,25 +1,64 @@
 #!/usr/bin/env node
 
 import { spawn } from 'child_process';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'fs';
 import * as path from 'path';
+import { PromptResolver } from './prompt-resolver';
+import { ExecutionContext, getPreferredContext } from './execution-context';
 
-// Spawn Claude agent as Node.js process within container
-function spawnAgent() {
-  const [, , agentType, ...promptArgs] = process.argv;
+interface AgentOptions {
+  agentType: string;
+  promptFile?: string;
+  executionMode?: ExecutionContext;
+  userPrompt: string;
+}
+
+function parseAgentArgs(): AgentOptions {
+  const args = process.argv.slice(2);
+  const agentType = args[0];
   
   if (!agentType || !['plan', 'worker', 'critic', 'oracle'].includes(agentType)) {
     console.error('Usage: claudo {plan|worker|critic|oracle} <prompt>');
     process.exit(1);
   }
+  
+  const result: AgentOptions = {
+    agentType,
+    userPrompt: ''
+  };
+  
+  const promptArgs: string[] = [];
+  
+  for (let i = 1; i < args.length; i++) {
+    const arg = args[i];
+    
+    if (arg === '--prompt-file' && i + 1 < args.length) {
+      result.promptFile = args[++i];
+    } else if (arg === '--execution-mode' && i + 1 < args.length) {
+      result.executionMode = args[++i] as ExecutionContext;
+    } else {
+      promptArgs.push(arg);
+    }
+  }
+  
+  result.userPrompt = promptArgs.join(' ');
+  return result;
+}
 
-  // Map 'plan' to 'planner' for consistency
-  const promptFile = agentType === 'plan' ? 'planner' : agentType;
+// Spawn Claude agent as Node.js process
+function spawnAgent() {
+  const { agentType, promptFile, executionMode, userPrompt } = parseAgentArgs();
   
-  // Read prompts from workspace location
-  const basePrompt = readFileSync(`/workspace/prompts/${promptFile}.md`, 'utf8');
+  // Determine execution context (prefer native for agents unless overridden)
+  const preferredContext = executionMode || getPreferredContext('agent');
+  const resolver = new PromptResolver(preferredContext);
   
-  const userPrompt = promptArgs.join(' ');
+  // Resolve prompt content
+  const basePrompt = resolver.resolve({
+    customPromptFile: promptFile,
+    agentType
+  });
+  
   const fullPrompt = `${basePrompt}\n\nTask: ${userPrompt}`;
   
   // Ensure .claudo directory exists
@@ -30,28 +69,29 @@ function spawnAgent() {
   const tempPromptFile = path.join(claudoDir, `${agentType}-prompt.txt`);
   writeFileSync(tempPromptFile, fullPrompt);
   
-  // Determine input format based on stdin
-  const hasInput = !process.stdin.isTTY;
-  const inputFormat = hasInput ? 'stream-json' : 'text';
+  // Read the prompt file content to pipe via stdin
+  const promptContent = readFileSync(tempPromptFile, 'utf8');
   
-  // Spawn Claude process - capture session ID and provide clean text output
-  const claude = spawn('claude', [
-    '-p', `$(cat ${tempPromptFile})`,
+  // Use stdin to avoid shell expansion issues with prompts containing '--' 
+  const claudeArgs = [
     '--dangerously-skip-permissions',
-    '--input-format', inputFormat,
-    '--model', 'sonnet',
-    '--verbose' // Needed to get session ID in stderr
-  ], {
+    '--model', 'sonnet'
+  ];
+
+  // Spawn Claude process - no shell needed since we're not using shell expansion
+  const claude = spawn('claude', claudeArgs, {
     stdio: ['pipe', 'pipe', 'pipe'],
-    shell: true
+    shell: false
   });
   
   let sessionId = '';
   let responseBuffer = '';
   
-  // Capture session ID from verbose output (stderr)
+  // Capture session ID from stderr (if verbose mode enabled)
   claude.stderr?.on('data', (data) => {
     const output = data.toString();
+    
+    // Try to extract session ID
     const sessionMatch = output.match(/Session ID: ([a-f0-9-]+)/);
     if (sessionMatch) {
       sessionId = sessionMatch[1];
@@ -66,17 +106,21 @@ function spawnAgent() {
     responseBuffer += data.toString();
   });
   
-  // Connect streams - direct text input to subagent
-  if (hasInput) {
-    process.stdin.pipe(claude.stdin);
-  }
+  // Write prompt to stdin and close it
+  claude.stdin?.write(promptContent);
+  claude.stdin?.end();
   
   claude.on('close', (code) => {
-    // Output clean response to Manager
+    // Output clean response
     if (responseBuffer) {
       process.stdout.write(responseBuffer);
     }
     process.exit(code || 0);
+  });
+  
+  claude.on('error', (error) => {
+    console.error('[claudo] Error spawning Claude:', error.message);
+    process.exit(1);
   });
 }
 
