@@ -1,8 +1,8 @@
 FROM node:18-alpine
 
-# Install Claude CLI, git, and bash for proper shell environment
+# Install Claude CLI, git, bash, and util-linux (for script command) for TTY support
 RUN npm install -g @anthropic-ai/claude-code && \
-    apk add --no-cache git bash
+    apk add --no-cache git bash util-linux
 
 # Use existing node user (UID 1000) for file permissions compatibility
 # Create Claude CLI configuration directory for node user
