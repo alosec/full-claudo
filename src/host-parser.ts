@@ -54,17 +54,21 @@ export class HostDockerParser {
       this.tailProcess = spawn('bash', ['-c', `tail -f ${this.outputFile}`], {
         stdio: ['ignore', 'pipe', 'pipe']
       });
-	let debugLoggingOn = false;
+      
+      const debugLoggingOn = false;
+      
       // Pipe tail output through our parser with monitoring
-      if (debugLoggingOn && this.tailProcess.stdout) {
-        // Monitor data flow
-        this.tailProcess.stdout.on('data', (chunk) => {
-          this.lastDataTime = Date.now();
-          this.bytesRead += chunk.length;
-          console.error(`[claudo-debug] Received ${chunk.length} bytes from tail (total: ${this.bytesRead})`);
-        });
+      if (this.tailProcess.stdout) {
+        // Monitor data flow only if debug is enabled
+        if (debugLoggingOn) {
+          this.tailProcess.stdout.on('data', (chunk) => {
+            this.lastDataTime = Date.now();
+            this.bytesRead += chunk.length;
+            console.error(`[claudo-debug] Received ${chunk.length} bytes from tail (total: ${this.bytesRead})`);
+          });
+        }
         
-        // Pipe to parser only (parser outputs directly via console.log)
+        // Always pipe to parser (parser outputs directly via console.log)
         this.tailProcess.stdout
           .on('error', (err) => {
             console.error('[claudo] Tail stdout error:', err.message);
