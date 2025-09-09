@@ -1,4 +1,5 @@
 import { execSync } from 'child_process';
+import { ExecutionContext } from '../execution-context';
 
 export function isDockerRunning(): boolean {
   try {
@@ -82,4 +83,51 @@ export function ensureDockerAvailable(): boolean {
     return false;
   }
   return true;
+}
+
+/**
+ * Check if Docker execution is available for fallback scenarios
+ */
+export function canRunInDocker(): boolean {
+  return isDockerRunning();
+}
+
+/**
+ * Get the preferred execution context for different command types
+ */
+export function getPreferredExecutionContext(commandType: 'agent' | 'manager'): ExecutionContext {
+  if (commandType === 'manager') {
+    return ExecutionContext.DOCKER;
+  } else {
+    // Agents prefer native execution by default
+    return ExecutionContext.NATIVE;
+  }
+}
+
+/**
+ * Resolve execution context with fallback logic
+ */
+export function resolveExecutionContext(
+  requested?: ExecutionContext,
+  commandType: 'agent' | 'manager' = 'agent'
+): ExecutionContext {
+  // If user explicitly requested a context, try to honor it
+  if (requested) {
+    if (requested === ExecutionContext.DOCKER && !canRunInDocker()) {
+      console.warn('[claudo] Warning: Docker requested but not available, falling back to native execution');
+      return ExecutionContext.NATIVE;
+    }
+    return requested;
+  }
+  
+  // Otherwise use preferences
+  const preferred = getPreferredExecutionContext(commandType);
+  
+  // For Docker preference, ensure Docker is available
+  if (preferred === ExecutionContext.DOCKER && !canRunInDocker()) {
+    console.warn('[claudo] Warning: Docker preferred but not available, falling back to native execution');
+    return ExecutionContext.NATIVE;
+  }
+  
+  return preferred;
 }
