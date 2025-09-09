@@ -1,33 +1,67 @@
 # Active Context
 
 ## Current Phase
-✅ LATEST PROGRESS: Docker path issues resolved in claudo script (2025-09-09)
+✅ LATEST SUCCESS: Full custom prompt support working in both native and Docker (2025-09-09)
 
-## Latest Updates: Agent Communication & Session Monitoring
-Fixed the critical agent spawning issue and enhanced the monitoring system:
+## Latest Updates: Custom Prompt File Support
+Successfully implemented `--prompt-file` functionality for agent commands:
 
 ### Changes Made:
-1. **src/agent.ts fixes:**
-   - Corrected prompt path from `/usr/local/lib/claudo/prompts/` → `/workspace/prompts/`
-   - Removed `--output-format stream-json` to prevent Manager context pollution
-   - Added session ID capture from Claude's verbose stderr output
-   - Store session IDs in `.claudo/[agent]-session.txt` for monitoring
-   - Return clean text responses to Manager (not streaming JSON)
+1. **Execution Context System (new):**
+   - Created `src/execution-context.ts` for detecting Docker vs native environment
+   - Created `src/prompt-resolver.ts` for cross-context prompt path resolution
+   - Agents default to native execution, Manager to Docker
 
-2. **src/logs.ts enhancements:**
-   - Added session monitoring that detects new subagent sessions
-   - Automatically tails specific session log files based on captured session IDs
-   - Monitors `~/.claude/projects/-home-alex-code-full-claudo/[session-id].jsonl`
-   - Provides real-time parsed output for subagents while keeping Manager context clean
+2. **CLI Enhancements:**
+   - Added `--prompt-file=<path>` flag for custom prompts
+   - Added `--docker` flag to force Docker execution
+   - Added `--native`/`--host` flags to force native execution
+   - Updated `claudo` bash script to route through cli.js for unified handling
 
-3. **Architecture improvements:**
-   - Manager gets clean text responses from subagents
-   - User sees full verbose activity via `claudo logs -f`
-   - No streaming JSON pollution in Manager's context
-   - Proper session isolation and monitoring
+3. **Agent Refactoring:**
+   - Fixed critical issue: prompts containing "--" were being parsed as CLI arguments
+   - Switched from `-p` flag with shell expansion to stdin piping
+   - Removed dependency on shell: true, now using direct stdin
+   - Dynamic prompt resolution based on execution context
+
+4. **Docker Utils Extensions:**
+   - Added execution context preference functions
+   - Fallback logic when Docker unavailable
+   - Context resolution with user override support
 
 ### Result:
-The Manager can now successfully spawn subagents using the corrected `claudo plan/worker/critic/oracle` commands, with users getting full visibility into subagent activity while maintaining clean inter-agent communication.
+✅ **Custom prompts work in both contexts**: `claudo plan --prompt-file=./custom.md "task"` works on host and in Docker
+✅ **Container claudo command fixed**: Dockerfile updated to copy and configure claudo properly
+
+## Critical Architecture Pattern - Agent Output Streaming
+
+**The Manager-Agent communication flow is designed with intentional separation:**
+
+### Desired UX Flow:
+```
+[Manager] → Bash: $ claudo plan "analyze requirements"
+[Planner] → Read: Reading project files...  
+[Planner] → Bash: Running analysis...
+[Planner] ... (streaming JSON activity visible via logs)
+[Planner] Final response: "Here's the plan..."
+[Manager] Excellent! The planner suggests: [processes response]
+```
+
+### Key Design Principles:
+1. **Session Capture**: When Manager spawns agent, capture the session ID from stderr
+2. **Log Tailing**: Monitor `~/.claude/projects/` inside container for session logs
+3. **Stream Integration**: Pipe session logs into Docker container output stream
+4. **User Visibility**: `claudo logs -f` shows full readable streaming output from subagents
+5. **Context Isolation**: Manager receives ONLY final text response, NOT streaming JSON
+6. **Clean Separation**: User sees everything, Manager context stays clean
+
+### Implementation Status:
+- ✅ Session ID capture logic exists in agent.ts
+- ✅ Log monitoring logic exists in logs.ts  
+- ❌ **Missing**: Integration to pipe subagent logs into container output stream
+- ❌ **Missing**: Manager not capturing/displaying agent responses properly
+
+This architecture ensures observability without context pollution - users get full visibility while Manager maintains focused context.
 
 ## Escaping Issues - Recurring Theme
 **Escaping problems have been a consistent challenge throughout this project:**
@@ -71,11 +105,14 @@ tail -f .claudo/manager-debug.jsonl | parser
 
 ## System Status
 - ✅ **Manager Function**: Works correctly, processes tasks, reads memory-bank
-- ✅ **Agent Spawning Paths**: FIXED - corrected Docker path detection in claudo script (2025-09-09)
-- 🚧 **Agent Process Execution**: Secondary issue identified - agents spawn but don't complete properly
-- ✅ **Session Monitoring**: Auto-detects and tails subagent sessions (when working)
-- ✅ **Clean Communication**: Architecture ready for text responses from subagents
-- ✅ **Live Output**: Enhanced logs with subagent monitoring operational
+- ✅ **Agent Spawning**: Works in both native and Docker contexts
+- ✅ **Custom Prompts**: Full support for --prompt-file with path resolution
+- ✅ **Execution Context**: Automatic detection of Docker vs native environment
+- ✅ **Session Monitoring**: Session ID capture implemented
+- ✅ **Clean Communication**: Text responses via stdin, no shell expansion issues
+- ✅ **Docker claudo**: Command available and working in container
+- ❌ **Response Capture**: Manager not properly displaying agent responses
+- ❌ **Log Integration**: Subagent logs not piped to container output stream
 
 ## Key Files
 - `src/host-parser.ts` - Host-based parser reading docker logs

@@ -8,31 +8,33 @@ RUN npm install -g @anthropic-ai/claude-code && \
 # Create Claude CLI configuration directory for node user
 RUN mkdir -p /home/node/.claude && chown node:node /home/node/.claude
 
-# Create claudo library directory
-RUN mkdir -p /usr/local/lib/claudo && chown node:node /usr/local/lib/claudo
+# Create workspace directory with proper permissions
+RUN mkdir -p /workspace && chown node:node /workspace
 
-# Copy all source files to container for building
-COPY --chown=node:node package*.json /usr/local/lib/claudo/
-COPY --chown=node:node tsconfig.json /usr/local/lib/claudo/
-COPY --chown=node:node src/ /usr/local/lib/claudo/src/
-COPY --chown=node:node prompts/ /usr/local/lib/claudo/prompts/
+# Copy all source files to workspace for building
+COPY --chown=node:node package*.json /workspace/
+COPY --chown=node:node tsconfig.json /workspace/
+COPY --chown=node:node src/ /workspace/src/
+COPY --chown=node:node prompts/ /workspace/prompts/
+COPY --chown=node:node claudo /workspace/claudo
 
 # Switch to node user and build directory
 USER node
-WORKDIR /usr/local/lib/claudo
+WORKDIR /workspace
 
 # Install dependencies and build TypeScript
 RUN npm install && npm run build
 
-# Switch to root to set permissions
+# Make claudo script executable
 USER root
+RUN chmod +x /workspace/claudo
 
 # Set working directory back to workspace
 WORKDIR /workspace
 
-# Set shell environment for Claude CLI compatibility
+# Set shell environment for Claude CLI compatibility and add claudo to PATH
 ENV SHELL=/bin/bash
-ENV PATH="/usr/local/lib/claudo/dist:$PATH"
+ENV PATH="/workspace:/workspace/dist/src:$PATH"
 
 # Switch back to node user
 USER node

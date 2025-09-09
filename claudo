@@ -27,23 +27,5 @@ if [[ "$1" == "--version" || "$1" == "-v" ]]; then
   exit 0
 fi
 
-case "$1" in
-  up)
-    echo "[claudo] Starting Manager..."
-    node "$CLAUDO_LIB/dist/src/up.js"
-    ;;
-  down)
-    echo "[claudo] Stopping Manager..."
-    node "$CLAUDO_LIB/dist/src/down.js"
-    ;;
-  logs)
-    node "$CLAUDO_LIB/dist/src/logs.js" "$@"
-    ;;
-  plan|worker|critic|oracle)
-    node "$CLAUDO_LIB/dist/src/agent.js" "$@"
-    ;;
-  *)
-    echo "Usage: claudo {up|down|logs|plan|worker|critic|oracle|--version|-v} [args...]"
-    exit 1
-    ;;
-esac
+# Pass all commands through cli.js for unified argument handling
+node "$CLAUDO_LIB/dist/src/cli.js" "$@"

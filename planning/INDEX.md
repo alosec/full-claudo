@@ -7,7 +7,7 @@ This is the master planning index for the Full Claudo multi-agent system. Tasks 
 _Tasks currently being worked on or planned_
 
 ### High Priority
-_None currently_
+- [test-agent-spawning](tasks/test-agent-spawning/README.md) - Test agent spawning functionality by validating Planner agent can create and execute tasks (2025-09-09)
 
 ### Medium Priority
 _None currently_
