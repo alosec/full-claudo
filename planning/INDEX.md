@@ -33,6 +33,7 @@ _Tasks that have been successfully completed_
 - [x] Fix parser types - remove 'as any' type assertions with proper interfaces (2025-09-08)
 - [x] Parser architecture simplification - moved to host-based parsing for reliable output (2025-09-08)
 - [x] Rename planning/done to planning/docs - better represents final step from requirements to code (2025-09-08)
+- [x] Fix agent spawning Docker paths - resolved claudo script path detection for Docker environment (2025-09-09)
 
 ## Feature Plans
 _Strategic feature planning documents_

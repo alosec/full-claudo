@@ -1,33 +1,33 @@
 # Active Context
 
 ## Current Phase
-✅ FEATURE COMPLETED: Successfully renamed planning/done → planning/docs directory
+✅ LATEST PROGRESS: Docker path issues resolved in claudo script (2025-09-09)
 
-## Latest Updates: Stream Error Handling
-Added comprehensive error handling and monitoring to diagnose silent parser failures:
+## Latest Updates: Agent Communication & Session Monitoring
+Fixed the critical agent spawning issue and enhanced the monitoring system:
 
 ### Changes Made:
-1. **parser.ts enhancements:**
-   - Added stream backpressure handling
-   - Enhanced error catching in output functions
-   - Added health monitoring with 10-second timeout warnings
-   - Implemented setImmediate for async processing to prevent stack overflow
-   - Added line counting and timing metrics
+1. **src/agent.ts fixes:**
+   - Corrected prompt path from `/usr/local/lib/claudo/prompts/` → `/workspace/prompts/`
+   - Removed `--output-format stream-json` to prevent Manager context pollution
+   - Added session ID capture from Claude's verbose stderr output
+   - Store session IDs in `.claudo/[agent]-session.txt` for monitoring
+   - Return clean text responses to Manager (not streaming JSON)
 
-2. **host-parser.ts monitoring:**
-   - Added data flow monitoring (bytes read, last data time)
-   - Health check every 5 seconds
-   - Auto-restart capability if tail process dies
-   - Enhanced error reporting on pipe failures
+2. **src/logs.ts enhancements:**
+   - Added session monitoring that detects new subagent sessions
+   - Automatically tails specific session log files based on captured session IDs
+   - Monitors `~/.claude/projects/-home-alex-code-full-claudo/[session-id].jsonl`
+   - Provides real-time parsed output for subagents while keeping Manager context clean
 
-3. **parser-debug.ts diagnostic tool:**
-   - Comprehensive stream flow tracing
-   - Monitors chunk reception, line processing, console output
-   - Logs all events to `.claudo/parser-debug.log`
-   - Health checks every 5 seconds with full metrics
+3. **Architecture improvements:**
+   - Manager gets clean text responses from subagents
+   - User sees full verbose activity via `claudo logs -f`
+   - No streaming JSON pollution in Manager's context
+   - Proper session isolation and monitoring
 
-### Debug Results:
-The parser IS receiving and processing data - debug output shows successful parsing of JSON messages. The issue appears to be intermittent rather than a complete failure.
+### Result:
+The Manager can now successfully spawn subagents using the corrected `claudo plan/worker/critic/oracle` commands, with users getting full visibility into subagent activity while maintaining clean inter-agent communication.
 
 ## Escaping Issues - Recurring Theme
 **Escaping problems have been a consistent challenge throughout this project:**
@@ -70,10 +70,12 @@ tail -f .claudo/manager-debug.jsonl | parser
 - Filter in parser: only parse lines starting with prefix
 
 ## System Status
-- ✅ **Manager Function**: Works correctly, processes tasks
-- ✅ **Debug Log**: Captures clean JSON stream reliably
-- ✅ **Live Output**: Fixed - clean stream parsing operational
-- ✅ **Clean Display**: Enhanced parser with color-coded output working
+- ✅ **Manager Function**: Works correctly, processes tasks, reads memory-bank
+- ✅ **Agent Spawning Paths**: FIXED - corrected Docker path detection in claudo script (2025-09-09)
+- 🚧 **Agent Process Execution**: Secondary issue identified - agents spawn but don't complete properly
+- ✅ **Session Monitoring**: Auto-detects and tails subagent sessions (when working)
+- ✅ **Clean Communication**: Architecture ready for text responses from subagents
+- ✅ **Live Output**: Enhanced logs with subagent monitoring operational
 
 ## Key Files
 - `src/host-parser.ts` - Host-based parser reading docker logs

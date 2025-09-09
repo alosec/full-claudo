@@ -9,10 +9,11 @@
 - Critic: Quality review and validation  
 - Oracle: Strategic guidance when stuck
 
-**Communication Pattern**: Process spawning via shell commands
+**Communication Pattern**: Clean agent spawning with session monitoring
 - Manager uses Bash tool to spawn: `claudo plan/worker/critic/oracle`
-- No complex message passing - simple process execution
-- Results captured via stdio
+- Agents return clean text responses (no streaming JSON pollution)
+- Session IDs captured automatically for user visibility
+- `claudo logs -f` monitors both Manager and subagent sessions
 
 ## Key Design Principles
 
@@ -61,6 +62,26 @@ Task Queue (.claudo/queue.txt)
 ├── memory-bank/          # Project state management
 ├── .claudo/              # Task queue and temp files
 └── docker/               # Container configuration
+```
+
+## Agent Communication Architecture
+
+### Session Management
+- Agent spawning via corrected `src/agent.ts` with `/workspace/prompts/` paths
+- Session IDs captured from Claude's verbose output and stored in `.claudo/[agent]-session.txt`
+- Clean text responses returned to Manager (no streaming JSON context pollution)
+- User visibility via `claudo logs -f` which auto-detects and tails new sessions
+
+### Log Monitoring Flow
+```
+Manager calls: claudo plan "task"
+    ↓
+agent.ts captures session ID → .claudo/plan-session.txt
+    ↓
+logs.ts detects new session ID → tails ~/.claude/projects/.../[session-id].jsonl
+    ↓
+User sees: [Planner] → Tool calls and responses via stream parser
+Manager gets: Clean final text response only
 ```
 
 ## Security Model

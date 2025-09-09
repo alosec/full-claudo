@@ -1,91 +1,29 @@
 # Current Blockers & Initiatives
 
-## 🚧 Initiative 1: Docker-in-Docker Architecture Problem (HIGH PRIORITY)
+## 🚧 Initiative 1: Agent Launching Script Environment Issue (HIGH PRIORITY)
 
 ### Problem
-The current architecture has a fundamental flaw:
-```
-Host System
-└── Docker Container (claudo-manager)
-    └── Manager Claude tries to run: `docker run claudo-container ...`
-       └── ERROR: /bin/sh: docker: not found
-```
+Manager Claude is operational and can read tasks, but fails when attempting to spawn other agents. The issue appears to be that the agent spawning scripts (`claudo plan/worker/critic/oracle`) expect to run outside Docker but are now being executed from within the container environment.
 
-Manager runs inside Docker but needs to spawn other agents in separate Docker containers. This requires Docker-in-Docker which isn't currently set up.
+### Current Architecture Status
+- ✅ **Manager Function**: Works correctly, processes tasks, reads memory-bank
+- ✅ **Docker Environment**: Container has proper Claude CLI access and authentication
+- ❌ **Agent Spawning**: Scripts may need adaptation for container-internal execution
 
-### Impact
-- Manager can initialize projects, read tasks, create memory-bank files
-- Manager **CANNOT** spawn Planner/Worker/Critic agents
-- Multi-agent workflow is blocked at the critical handoff point
+### Investigation Needed
+The agent scripts might need to be modified to work properly when launched from within the Docker container. The container itself has Claude CLI available, so theoretically agents should be able to run.
 
-### Solution Options
+### Proposed Solution
+Create an inbox item requesting the Manager directly investigate and fix the agent launching scripts by:
+1. Exploring current script behavior within container
+2. Identifying the correct pattern to launch agents from container environment  
+3. Testing and validating agent spawning works end-to-end
 
-#### Option 1: Docker-in-Docker (DinD)
-**Pros:**
-- Maintains container isolation for all agents
-- Keeps current architecture mostly intact
-
-**Cons:**
-- Complex setup (install Docker in container)
-- Security concerns with socket mounting
-- Heavier resource usage
-
-**Implementation:**
-```dockerfile
-# Add to Dockerfile
-RUN apk add --no-cache docker
-# Add to docker run command
--v /var/run/docker.sock:/var/run/docker.sock
-```
-
-#### Option 2: Host-level Agent Spawning
-**Pros:**  
-- Clean separation - Manager coordinates, Host executes
-- Better security model
-
-**Cons:**
-- More complex communication mechanism
-- Requires host-side daemon/script
-
-**Implementation:**
-- Manager writes spawn requests to shared volume
-- Host script monitors and spawns containers
-- Results communicated back via filesystem
-
-#### Option 3: All-in-One Container
-**Pros:**
-- Simplest to implement
-- No Docker-in-Docker complexity
-
-**Cons:**
-- Less isolation between agents
-- Potential resource conflicts
-
-**Implementation:**
-- Run all agents as separate processes in same container
-- Use process isolation instead of container isolation
-
-#### Option 4: Host-based Manager  
-**Pros:**
-- Manager has native Docker access
-- Agents still get container isolation
-
-**Cons:**
-- Manager not sandboxed
-- More complex installation
-
-**Implementation:**
-- Manager runs as native Node.js process on host
-- Only Planner/Worker/Critic run in containers
-
-### Decision Criteria
-- **Simplicity**: How easy to implement and maintain?
-- **Security**: How well does it isolate potentially dangerous code execution?
-- **Resource Usage**: How efficient is it?
-- **Reliability**: How likely is it to work across different systems?
+### Next Action
+**Create inbox item**: "Fix agent launching scripts to work correctly within Docker container environment"
 
 ### Status
-⏳ **Decision Pending** - Need to evaluate trade-offs and choose approach
+⏳ **Solution Identified** - Ready to create inbox task for Manager to resolve
 
 ---
 

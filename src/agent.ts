@@ -3,7 +3,6 @@
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import * as path from 'path';
-import { ClaudeStreamParser } from './parser';
 
 // Spawn Claude agent as Node.js process within container
 function spawnAgent() {
@@ -17,8 +16,8 @@ function spawnAgent() {
   // Map 'plan' to 'planner' for consistency
   const promptFile = agentType === 'plan' ? 'planner' : agentType;
   
-  // Read prompts from container's installed location
-  const basePrompt = readFileSync(`/usr/local/lib/claudo/prompts/${promptFile}.md`, 'utf8');
+  // Read prompts from workspace location
+  const basePrompt = readFileSync(`/workspace/prompts/${promptFile}.md`, 'utf8');
   
   const userPrompt = promptArgs.join(' ');
   const fullPrompt = `${basePrompt}\n\nTask: ${userPrompt}`;
@@ -35,30 +34,48 @@ function spawnAgent() {
   const hasInput = !process.stdin.isTTY;
   const inputFormat = hasInput ? 'stream-json' : 'text';
   
-  // Spawn Claude process
+  // Spawn Claude process - capture session ID and provide clean text output
   const claude = spawn('claude', [
     '-p', `$(cat ${tempPromptFile})`,
     '--dangerously-skip-permissions',
-    '--output-format', 'stream-json',
     '--input-format', inputFormat,
-    '--verbose',
-    '--model', 'sonnet'
+    '--model', 'sonnet',
+    '--verbose' // Needed to get session ID in stderr
   ], {
-    stdio: ['pipe', 'pipe', 'inherit'],
+    stdio: ['pipe', 'pipe', 'pipe'],
     shell: true
   });
   
-  // Set up stream parsing for human-readable output
-  const parser = new ClaudeStreamParser(agentType.charAt(0).toUpperCase() + agentType.slice(1));
+  let sessionId = '';
+  let responseBuffer = '';
   
-  // Connect streams
+  // Capture session ID from verbose output (stderr)
+  claude.stderr?.on('data', (data) => {
+    const output = data.toString();
+    const sessionMatch = output.match(/Session ID: ([a-f0-9-]+)/);
+    if (sessionMatch) {
+      sessionId = sessionMatch[1];
+      // Write session ID to temp file for monitoring
+      const sessionFile = path.join(claudoDir, `${agentType}-session.txt`);
+      writeFileSync(sessionFile, sessionId);
+    }
+  });
+  
+  // Buffer stdout for clean text response
+  claude.stdout?.on('data', (data) => {
+    responseBuffer += data.toString();
+  });
+  
+  // Connect streams - direct text input to subagent
   if (hasInput) {
     process.stdin.pipe(claude.stdin);
   }
   
-  claude.stdout.pipe(parser);
-  
   claude.on('close', (code) => {
+    // Output clean response to Manager
+    if (responseBuffer) {
+      process.stdout.write(responseBuffer);
+    }
     process.exit(code || 0);
   });
 }

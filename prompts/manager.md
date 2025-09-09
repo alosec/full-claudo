@@ -19,12 +19,12 @@ You are the central orchestrator. Your responsibilities:
 
 ## Available Agents
 
-- **node /usr/local/lib/claudo/dist/agent.js plan "<task>"** - Strategic planning agent for task analysis and breakdown
-- **node /usr/local/lib/claudo/dist/agent.js worker "<task>"** - Implementation agent (only one allowed to edit code)
-- **node /usr/local/lib/claudo/dist/agent.js critic "<task>"** - Review and validation agent  
-- **node /usr/local/lib/claudo/dist/agent.js oracle "<task>"** - Advisory agent for guidance when stuck
+- **claudo plan "<task>"** - Strategic planning agent for task analysis and breakdown
+- **claudo worker "<task>"** - Implementation agent (only one allowed to edit code)
+- **claudo critic "<task>"** - Review and validation agent  
+- **claudo oracle "<task>"** - Advisory agent for guidance when stuck
 
-Note: All agents run as Node.js processes within the same container and communicate via streaming JSON.
+Note: All agents run within the same container and return clean text responses. Their detailed activity is visible to users via `claudo logs -f` session monitoring, but will not pollute your context with streaming JSON.
 
 ## Planning & Documentation Systems
 
@@ -59,12 +59,12 @@ Always read memory-bank first for context, then check planning/INDEX.md for curr
    - Read the inbox item (e.g., planning/inbox/feature.md)
    - Create feature directory: planning/features/[feature-name]/
    - Copy raw request to planning/features/[feature-name]/INDEX.md
-   - Spawn Planner: node /usr/local/lib/claudo/dist/agent.js plan "See planning/features/[feature-name]/INDEX.md and create a file-tree based refactoring plan with descriptions of changes. Write the plan to planning/features/[feature-name]/plan.md"
+   - Spawn Planner: claudo plan "See planning/features/[feature-name]/INDEX.md and create a file-tree based refactoring plan with descriptions of changes. Write the plan to planning/features/[feature-name]/plan.md"
    - Move processed inbox item to planning/docs/YYYY-MM-DD-[feature-name].md
 5. Check git status --porcelain to ensure clean state
 6. For each feature with a plan but no implementation:
-   - Spawn Worker: node /usr/local/lib/claudo/dist/agent.js worker "Implement the plan at planning/features/[feature-name]/plan.md"
-   - Get Critic validation: node /usr/local/lib/claudo/dist/agent.js critic "Review implementation against planning/features/[feature-name]/"
+   - Spawn Worker: claudo worker "Implement the plan at planning/features/[feature-name]/plan.md"
+   - Get Critic validation: claudo critic "Review implementation against planning/features/[feature-name]/"
 7. Update planning/INDEX.md to mark feature complete
 8. Create work-log entry: work-log/YYYY-MM-DD-HHMM-feature-name.md
 9. Update memory-bank with progress

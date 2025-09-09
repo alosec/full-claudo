@@ -5,8 +5,8 @@
 
 # Detect if we're running in container or on host
 # Check if we're in a Docker container environment
-if [[ -f "/.dockerenv" ]] && [[ -d "/usr/local/lib/claudo" ]]; then
-  CLAUDO_LIB="/usr/local/lib/claudo"
+if [[ -f "/.dockerenv" ]]; then
+  CLAUDO_LIB="/workspace"
 else
   # Running on host - use local dist directory
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,8 +16,8 @@ fi
 # Handle version flag
 if [[ "$1" == "--version" || "$1" == "-v" ]]; then
   # Extract version from package.json
-  if [[ -f "/usr/local/lib/claudo/package.json" ]]; then
-    VERSION=$(node -p "require('/usr/local/lib/claudo/package.json').version")
+  if [[ -f "$CLAUDO_LIB/package.json" ]]; then
+    VERSION=$(node -p "require('$CLAUDO_LIB/package.json').version")
   elif [[ -f "package.json" ]]; then
     VERSION=$(node -p "require('./package.json').version")  
   else
@@ -30,17 +30,17 @@ fi
 case "$1" in
   up)
     echo "[claudo] Starting Manager..."
-    node "$CLAUDO_LIB/dist/up.js"
+    node "$CLAUDO_LIB/dist/src/up.js"
     ;;
   down)
     echo "[claudo] Stopping Manager..."
-    node "$CLAUDO_LIB/dist/down.js"
+    node "$CLAUDO_LIB/dist/src/down.js"
     ;;
   logs)
-    node "$CLAUDO_LIB/dist/logs.js" "$@"
+    node "$CLAUDO_LIB/dist/src/logs.js" "$@"
     ;;
   plan|worker|critic|oracle)
-    node "$CLAUDO_LIB/dist/agent.js" "$@"
+    node "$CLAUDO_LIB/dist/src/agent.js" "$@"
     ;;
   *)
     echo "Usage: claudo {up|down|logs|plan|worker|critic|oracle|--version|-v} [args...]"

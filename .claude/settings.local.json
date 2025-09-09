@@ -3,7 +3,9 @@
     "allow": [
       "Read(//home/alex/.claude/agents/**)",
       "WebFetch(domain:alexgarcia.blog)",
-      "Bash(docker:*)"
+      "Bash(docker:*)",
+      "Bash(claudo logs:*)",
+      "Read(//home/alex/.claude/**)"
     ],
     "deny": [],
     "ask": []
