@@ -4,9 +4,44 @@ import { spawn } from 'child_process';
 import { join } from 'path';
 import { DockerManager } from './docker-manager';
 import { ensureDockerAvailable } from './utils/docker-utils';
+import { ExecutionContext } from './execution-context';
 
-const command = process.argv[2];
-const args = process.argv.slice(3);
+interface ParsedArgs {
+  command: string;
+  promptFile?: string;
+  executionMode?: ExecutionContext;
+  remainingArgs: string[];
+}
+
+function parseArgs(): ParsedArgs {
+  const command = process.argv[2];
+  const args = process.argv.slice(3);
+  
+  const result: ParsedArgs = {
+    command,
+    remainingArgs: []
+  };
+  
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    
+    if (arg.startsWith('--prompt-file=')) {
+      result.promptFile = arg.split('=')[1];
+    } else if (arg === '--prompt-file' && i + 1 < args.length) {
+      result.promptFile = args[++i];
+    } else if (arg === '--docker') {
+      result.executionMode = ExecutionContext.DOCKER;
+    } else if (arg === '--native' || arg === '--host') {
+      result.executionMode = ExecutionContext.NATIVE;
+    } else {
+      result.remainingArgs.push(arg);
+    }
+  }
+  
+  return result;
+}
+
+const { command, promptFile, executionMode, remainingArgs: args } = parseArgs();
 
 const scriptPath = (script: string) => join(__dirname, script);
 
@@ -55,7 +90,23 @@ switch (command) {
   case 'worker':
   case 'critic':
   case 'oracle':
-    const agentProcess = spawn('node', [scriptPath('agent.js'), command, ...args], {
+    // Build arguments for agent
+    const agentArgs = [scriptPath('agent.js'), command];
+    
+    // Add execution context if specified
+    if (executionMode) {
+      agentArgs.push('--execution-mode', executionMode);
+    }
+    
+    // Add prompt file if specified
+    if (promptFile) {
+      agentArgs.push('--prompt-file', promptFile);
+    }
+    
+    // Add remaining user arguments
+    agentArgs.push(...args);
+
+    const agentProcess = spawn('node', agentArgs, {
       stdio: 'inherit',
       shell: false
     });
@@ -97,15 +148,20 @@ Commands:
   oracle       Run the oracle agent
 
 Options:
-  --version    Show version number
-  --help       Show this help message
+  --version              Show version number
+  --help                 Show this help message
+  --prompt-file <path>   Use custom prompt file (agent commands only)
+  --docker               Force Docker execution (agent commands only)
+  --native, --host       Force native execution (agent commands only)
 
 Examples:
-  claudo up              # Start the manager (auto-builds if needed)
-  claudo build           # Build Docker image
-  claudo logs -f         # Follow manager logs
-  claudo plan "task"     # Run planning agent with task
-  claudo down            # Stop the manager
+  claudo up                                    # Start the manager (auto-builds if needed)
+  claudo build                                 # Build Docker image
+  claudo logs -f                               # Follow manager logs
+  claudo plan "task"                           # Run planning agent with task
+  claudo plan --prompt-file=./my-prompt.md    # Use custom prompt file
+  claudo plan --docker "task"                 # Force Docker execution
+  claudo down                                  # Stop the manager
 `);
     break;
 
