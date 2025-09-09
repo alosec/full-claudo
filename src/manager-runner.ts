@@ -32,12 +32,12 @@ function runManager() {
   let spawnOptions: any;
   
   if (isInteractive) {
-    // Interactive mode: Use script to provide pseudo-TTY for Claude's raw mode
-    // The script command creates a pseudo-terminal that satisfies Claude's TTY requirements
-    command = `script -q -c "cat '${promptFile}' | claude --dangerously-skip-permissions --model sonnet" /dev/null`;
-    console.log('[claudo] Starting interactive Manager session...');
-    console.log('[claudo] Using pseudo-TTY to enable Claude interactive mode.');
-    console.log('[claudo] You can interact with the Manager agent below.');
+    // Interactive mode: Use --print flag to avoid TTY issues entirely
+    // This provides a single-shot response but with full visibility
+    command = `claude --dangerously-skip-permissions --model sonnet --print --prompt "$(cat '${promptFile}')"`;
+    console.log('[claudo] Starting Manager in debug mode...');
+    console.log('[claudo] Manager will process the full prompt and show its reasoning.');
+    console.log('[claudo] Note: This is a single-response mode for debugging.');
     console.log('');
     
     spawnOptions = {

@@ -54,9 +54,9 @@ async function spawnManager() {
       claudo-container \
       node /workspace/dist/src/manager-runner.js`;
     
-    console.log('[claudo] Starting interactive Manager session...');
-    console.log('[claudo] You will have direct Claude Code access to the Manager.');
-    console.log('[claudo] Press Ctrl+C to exit.\n');
+    console.log('[claudo] Starting Manager in debug mode...');
+    console.log('[claudo] Manager will process once and show full output.');
+    console.log('[claudo] This is useful for debugging agent coordination.\n');
     
     try {
       // Run interactively - this will attach to current terminal

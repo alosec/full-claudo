@@ -34,8 +34,8 @@ function parseArgs(): ParsedArgs {
       result.executionMode = ExecutionContext.DOCKER;
     } else if (arg === '--native' || arg === '--host') {
       result.executionMode = ExecutionContext.NATIVE;
-    } else if (arg === '-it' || arg === '--interactive') {
-      result.interactive = true;
+    } else if (arg === '-d' || arg === '--debug') {
+      result.interactive = true;  // Using same flag internally
     } else {
       result.remainingArgs.push(arg);
     }
@@ -51,7 +51,7 @@ const scriptPath = (script: string) => join(__dirname, script);
 switch (command) {
   case 'up':
     if (interactive) {
-      console.log('[claudo] Starting Manager in interactive mode...');
+      console.log('[claudo] Starting Manager in debug mode...');
       process.env.CLAUDO_INTERACTIVE = 'true';
     } else {
       console.log('[claudo] Starting Manager...');
@@ -145,7 +145,7 @@ Usage: claudo <command> [options]
 
 Commands:
   up           Start the Manager container (auto-builds if needed)
-  up -it       Start Manager in interactive mode for debugging
+  up -d        Start Manager in debug mode (single response with full output)
   down         Stop the Manager container
   build        Build the Docker image if missing
   rebuild      Force rebuild the Docker image
