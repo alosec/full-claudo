@@ -11,6 +11,7 @@ import { ensureDockerAvailable, getContainerStatus, removeContainer } from './ut
 async function spawnManager() {
   const containerName = 'claudo-manager';
   const isInteractive = process.env.CLAUDO_INTERACTIVE === 'true';
+  const isDebug = process.env.CLAUDO_DEBUG === 'true';
   
   // Ensure Docker is available
   if (!ensureDockerAvailable()) {
@@ -43,8 +44,36 @@ async function spawnManager() {
   const claudoDir = path.join(process.cwd(), '.claudo');
   mkdirSync(claudoDir, { recursive: true });
   
-  if (isInteractive) {
-    // Interactive mode: Run with -it for direct Claude Code session
+  if (isDebug) {
+    // Debug mode: Run with -it for single response with full output
+    const cmd = `docker run -it --rm --name ${containerName} \
+      -v "$(pwd):/workspace" \
+      -v "$HOME/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro" \
+      -v "$HOME/.claude/settings.json:/home/node/.claude/settings.json:ro" \
+      -w /workspace \
+      -e CLAUDO_DEBUG=true \
+      claudo-container \
+      node /workspace/dist/src/manager-runner.js`;
+    
+    console.log('[claudo] Starting Manager in debug mode...');
+    console.log('[claudo] Manager will process once and show full output.');
+    console.log('[claudo] This is useful for debugging agent coordination.\n');
+    
+    try {
+      // Run interactively - this will attach to current terminal
+      execSync(cmd, { 
+        stdio: 'inherit',
+        cwd: process.cwd() 
+      });
+    } catch (error: any) {
+      // Ctrl+C or exit is normal, only report real errors
+      if (error.status !== 130 && error.status !== 0) {
+        console.error('[claudo] Error in debug session:', error.message);
+        process.exit(1);
+      }
+    }
+  } else if (isInteractive) {
+    // Interactive mode: Run with -it for full Claude session
     const cmd = `docker run -it --rm --name ${containerName} \
       -v "$(pwd):/workspace" \
       -v "$HOME/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro" \
@@ -54,9 +83,9 @@ async function spawnManager() {
       claudo-container \
       node /workspace/dist/src/manager-runner.js`;
     
-    console.log('[claudo] Starting Manager in debug mode...');
-    console.log('[claudo] Manager will process once and show full output.');
-    console.log('[claudo] This is useful for debugging agent coordination.\n');
+    console.log('[claudo] Starting Manager in interactive mode...');
+    console.log('[claudo] You can interact directly with the Manager Claude.');
+    console.log('[claudo] Press Ctrl+C to exit.\n');
     
     try {
       // Run interactively - this will attach to current terminal

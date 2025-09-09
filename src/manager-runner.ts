@@ -4,9 +4,10 @@ import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, mkdirSync, createWriteStream } from 'fs';
 import * as path from 'path';
 
-// Run Manager Claude within container - supports both JSON streaming and interactive modes
+// Run Manager Claude within container - supports JSON streaming, debug, and interactive modes
 function runManager() {
   const isInteractive = process.env.CLAUDO_INTERACTIVE === 'true';
+  const isDebug = process.env.CLAUDO_DEBUG === 'true';
   const workDir = '/workspace';
   const claudoDir = path.join(workDir, '.claudo');
   const managerSystemPrompt = path.join(workDir, 'prompts', 'manager.md');
@@ -31,9 +32,8 @@ function runManager() {
   let command: string;
   let spawnOptions: any;
   
-  if (isInteractive) {
-    // Interactive mode: Use --print flag to avoid TTY issues entirely
-    // This provides a single-shot response but with full visibility
+  if (isDebug) {
+    // Debug mode: Use --print flag for single response with full visibility
     command = `claude --dangerously-skip-permissions --model sonnet --print --prompt "$(cat '${promptFile}')"`;
     console.log('[claudo] Starting Manager in debug mode...');
     console.log('[claudo] Manager will process the full prompt and show its reasoning.');
@@ -41,10 +41,29 @@ function runManager() {
     console.log('');
     
     spawnOptions = {
-      stdio: 'inherit',  // Direct terminal I/O for interactive mode
+      stdio: 'inherit',  // Direct terminal I/O for debug mode
       env: {
         ...process.env,
         NODE_ENV: 'production'
+      }
+    };
+  } else if (isInteractive) {
+    // Interactive mode: Start Claude without initial prompt in a PTY
+    // User will need to paste the context manually or we'll show it as reference
+    console.log('[claudo] Starting Manager in interactive mode...');
+    console.log('[claudo] Note: Due to TTY limitations in Docker, starting without initial context.');
+    console.log('[claudo] Manager context has been saved to:', promptFile);
+    console.log('[claudo] You can reference it in your conversation.\n');
+    
+    // Use script to provide PTY, start Claude without initial prompt
+    command = `script -e -q -c "claude --dangerously-skip-permissions --model sonnet" /dev/null`;
+    
+    spawnOptions = {
+      stdio: 'inherit',  // Direct terminal I/O for interactive mode
+      env: {
+        ...process.env,
+        NODE_ENV: 'production',
+        TERM: 'xterm-256color'  // Ensure proper terminal type
       }
     };
   } else {
@@ -66,7 +85,7 @@ function runManager() {
   // Spawn the command in container context
   const manager = spawn('bash', ['-c', command], spawnOptions);
   
-  if (!isInteractive) {
+  if (!isInteractive && !isDebug) {
     // Set up output logging to capture clean JSON stream (non-interactive only)
     const outputLogPath = path.join(claudoDir, 'manager-output.jsonl');
     const outputStream = createWriteStream(outputLogPath, { flags: 'a' });
@@ -111,8 +130,12 @@ function runManager() {
 // Check if run directly or imported
 if (require.main === module) {
   const isInteractive = process.env.CLAUDO_INTERACTIVE === 'true';
+  const isDebug = process.env.CLAUDO_DEBUG === 'true';
+  
   if (isInteractive) {
     console.log('[claudo] Starting Manager in interactive mode...');
+  } else if (isDebug) {
+    console.log('[claudo] Starting Manager in debug mode...');
   } else {
     console.error('[claudo] Starting Manager with streaming JSON bus...');
   }

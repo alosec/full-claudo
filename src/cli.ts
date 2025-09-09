@@ -10,7 +10,8 @@ interface ParsedArgs {
   command: string;
   promptFile?: string;
   executionMode?: ExecutionContext;
-  interactive?: boolean;
+  debugMode?: boolean;
+  interactiveMode?: boolean;
   remainingArgs: string[];
 }
 
@@ -35,7 +36,9 @@ function parseArgs(): ParsedArgs {
     } else if (arg === '--native' || arg === '--host') {
       result.executionMode = ExecutionContext.NATIVE;
     } else if (arg === '-d' || arg === '--debug') {
-      result.interactive = true;  // Using same flag internally
+      result.debugMode = true;
+    } else if (arg === '-it' || arg === '--interactive') {
+      result.interactiveMode = true;
     } else {
       result.remainingArgs.push(arg);
     }
@@ -44,14 +47,17 @@ function parseArgs(): ParsedArgs {
   return result;
 }
 
-const { command, promptFile, executionMode, interactive, remainingArgs: args } = parseArgs();
+const { command, promptFile, executionMode, debugMode, interactiveMode, remainingArgs: args } = parseArgs();
 
 const scriptPath = (script: string) => join(__dirname, script);
 
 switch (command) {
   case 'up':
-    if (interactive) {
+    if (debugMode) {
       console.log('[claudo] Starting Manager in debug mode...');
+      process.env.CLAUDO_DEBUG = 'true';
+    } else if (interactiveMode) {
+      console.log('[claudo] Starting Manager in interactive mode...');
       process.env.CLAUDO_INTERACTIVE = 'true';
     } else {
       console.log('[claudo] Starting Manager...');
@@ -146,6 +152,7 @@ Usage: claudo <command> [options]
 Commands:
   up           Start the Manager container (auto-builds if needed)
   up -d        Start Manager in debug mode (single response with full output)
+  up -it       Start Manager in interactive mode (full Claude session)
   down         Stop the Manager container
   build        Build the Docker image if missing
   rebuild      Force rebuild the Docker image
