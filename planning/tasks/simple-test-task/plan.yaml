@@ -1,0 +1,55 @@
+task: "Simple end-to-end test of multi-agent workflow"
+priority: high
+estimated_effort: "30 minutes"
+dependencies: ["Manager running", "All agents accessible", "Docker environment working"]
+
+analysis:
+  current_state: "Multi-agent system architecture is implemented but needs validation"
+  requirements: "Prove the complete workflow from task → planning → execution → review works"
+  approach: "Minimal test case with simple file creation to validate orchestration"
+
+implementation_steps:
+  - step: "Add test task to queue"
+    files: [".claudo/queue.txt"]
+    type: "modify"
+    description: "Queue the hello-world file creation task"
+    
+  - step: "Manager processes task from queue"
+    files: ["planning/tasks/simple-test-task/"]
+    type: "create"
+    description: "Manager reads task and initiates planning phase"
+    
+  - step: "Planner creates implementation strategy"
+    files: ["planning/tasks/simple-test-task/plan.md"]
+    type: "create"  
+    description: "Planner analyzes requirements and creates file-tree plan"
+    
+  - step: "Worker executes file creation"
+    files: ["hello-world.txt"]
+    type: "create"
+    description: "Worker creates the hello-world.txt file with timestamp"
+    
+  - step: "Critic validates implementation"
+    files: ["planning/tasks/simple-test-task/review.md"]
+    type: "create"
+    description: "Critic reviews file creation meets requirements"
+    
+  - step: "Manager completes task"
+    files: ["work-log/2025-09-09-simple-test-task.md"]
+    type: "create"
+    description: "Manager documents completion and moves to work-log"
+
+testing_strategy:
+  - "Monitor `claudo logs -f` during execution for full visibility"
+  - "Verify each agent produces expected outputs"
+  - "Confirm hello-world.txt contains current timestamp"
+  - "Validate task moves through all workflow stages"
+  - "Check all metadata files are created correctly"
+
+completion_criteria:
+  - "hello-world.txt file exists in project root"
+  - "File contains current timestamp and expected message"
+  - "All agent interactions are visible in logs"
+  - "Task is documented in work-log/ with completion status"
+  - "No manual intervention required during execution"
+  - "Session capture works for all spawned agents"

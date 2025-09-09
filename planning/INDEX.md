@@ -7,13 +7,15 @@ This is the master planning index for the Full Claudo multi-agent system. Tasks 
 _Tasks currently being worked on or planned_
 
 ### High Priority
-_None currently_
+- [ ] [Multi-Agent System Test](tasks/test/) - Comprehensive validation of complete multi-agent workflow with calculator task
+- [ ] [Simple Test Task](tasks/simple-test-task/) - End-to-end validation of multi-agent workflow with minimal file creation task
+- [ ] [Test Session ID Capture](tasks/test-session-capture/) - Validate session ID extraction and monitoring works correctly
 
 ### Medium Priority
 _None currently_
 
 ### Low Priority
-_None currently_
+- [ ] [Hello World Test](tasks/hello-world-test/) - Simple hello world test to validate basic testing infrastructure
 
 ## Completed Tasks
 _Tasks that have been successfully completed_

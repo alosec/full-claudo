@@ -50,45 +50,91 @@ function monitorSubagentSessions(sessionDir: string): void {
   
   setInterval(() => {
     try {
-      // Check for agent session files
+      // Check for agent metadata files (new enhanced format)
       const sessionTypes = ['plan', 'worker', 'critic', 'oracle'];
       
       sessionTypes.forEach(agentType => {
-        const sessionFile = path.join(claudoDir, `${agentType}-session.txt`);
+        // First try new metadata format
+        const metadataFile = path.join(claudoDir, `${agentType}-metadata.json`);
+        let sessionLogFile: string | null = null;
+        let sessionId: string | null = null;
         
         try {
-          const sessionId = readFileSync(sessionFile, 'utf8').trim();
-          const sessionLogFile = path.join(sessionDir, `${sessionId}.jsonl`);
+          // Try to read the enhanced metadata file
+          const metadata = JSON.parse(readFileSync(metadataFile, 'utf8'));
+          sessionId = metadata.sessionId;
+          sessionLogFile = metadata.sessionFile;
           
-          // Check if this session log exists and we haven't watched it yet
-          if (!watchedSessions.has(sessionId)) {
-            try {
-              statSync(sessionLogFile);
-              watchedSessions.add(sessionId);
-              
-              console.log(`[claudo] 🔄 Monitoring ${agentType} agent session (${sessionId.substr(0, 8)}...)`);
-              
-              // Tail the specific session file with parsing
-              const tail = spawn('tail', ['-f', sessionLogFile], { stdio: 'pipe' });
-              const parser = new ClaudeStreamParser(agentType.charAt(0).toUpperCase() + agentType.slice(1));
-              
-              tail.stdout.pipe(parser);
-              
-              tail.on('close', () => {
-                console.log(`[claudo] ✓ ${agentType.charAt(0).toUpperCase() + agentType.slice(1)} agent completed`);
-              });
-              
-            } catch {
-              // Session log file doesn't exist yet, will check again next interval
-            }
+          // Validate the session file exists
+          if (sessionLogFile) {
+            statSync(sessionLogFile);
           }
         } catch {
-          // Session file doesn't exist yet
+          // Fall back to old format if metadata doesn't exist
+          const sessionFile = path.join(claudoDir, `${agentType}-session.txt`);
+          const projectFile = path.join(claudoDir, `${agentType}-project.txt`);
+          
+          try {
+            sessionId = readFileSync(sessionFile, 'utf8').trim();
+            
+            // Try to get project path or use default
+            let projectPath = sessionDir;
+            try {
+              projectPath = readFileSync(projectFile, 'utf8').trim();
+            } catch {
+              // Use default sessionDir if project path not found
+            }
+            
+            sessionLogFile = path.join(projectPath, `${sessionId}.jsonl`);
+            
+            // Validate the session file exists
+            if (sessionLogFile) {
+              statSync(sessionLogFile);
+            }
+          } catch {
+            // Neither format available or session file doesn't exist
+            return;
+          }
+        }
+        
+        // Check if this session log exists and we haven't watched it yet
+        if (sessionId && sessionLogFile && !watchedSessions.has(sessionId)) {
+          try {
+            watchedSessions.add(sessionId);
+            
+            console.log(`[claudo] 🔄 Monitoring ${agentType} agent session (${sessionId.substring(0, 8)}...)`);
+            
+            // Tail the specific session file with parsing
+            const tail = spawn('tail', ['-f', sessionLogFile], { stdio: 'pipe' });
+            const parser = new ClaudeStreamParser({
+              agentName: agentType.charAt(0).toUpperCase() + agentType.slice(1),
+              useColors: true
+            });
+            
+            tail.stdout.pipe(parser);
+            
+            tail.on('close', () => {
+              console.log(`[claudo] ✓ ${agentType.charAt(0).toUpperCase() + agentType.slice(1)} agent completed`);
+            });
+            
+            tail.on('error', (err) => {
+              console.error(`[claudo] Failed to tail ${agentType} session: ${err.message}`);
+            });
+            
+          } catch (e) {
+            // Session log file doesn't exist yet, will check again next interval
+            if (process.env.DEBUG_AGENT) {
+              console.error(`[claudo-debug] Failed to monitor ${agentType}: ${e}`);
+            }
+          }
         }
       });
       
     } catch (e) {
       // Ignore errors in monitoring
+      if (process.env.DEBUG_AGENT) {
+        console.error(`[claudo-debug] Monitor error: ${e}`);
+      }
     }
   }, 1000); // Check every second for faster response
 }
@@ -97,7 +143,28 @@ function monitorSubagentSessions(sessionDir: string): void {
 function showLogs() {
   const containerName = 'claudo-manager';
   
-  // Check if container exists
+  // Check for standalone mode (monitoring subagents without Manager)
+  const args = process.argv.slice(2);
+  const isStandalone = args.includes('--standalone') || args.includes('-s');
+  
+  if (isStandalone) {
+    // Standalone mode: only monitor subagent sessions
+    const sessionDir = getSessionDirectory();
+    if (sessionDir) {
+      console.log('[claudo] Monitoring for subagent sessions (standalone mode)...');
+      console.log('[claudo] Press Ctrl+C to stop.');
+      monitorSubagentSessions(sessionDir);
+      
+      // Keep process running
+      setInterval(() => {}, 1000);
+    } else {
+      console.error('[claudo] No Claude project directory found for current workspace.');
+      process.exit(1);
+    }
+    return;
+  }
+  
+  // Normal mode: Monitor Manager + subagents
   let containerExists = false;
   
   try {
@@ -133,11 +200,23 @@ function showLogs() {
     }
     
   } catch (e) {
-    // Container doesn't exist
-    console.error('[claudo] No logs available.');
-    console.error('[claudo] Manager container not found.');
-    console.error('[claudo] Use "claudo up" to start the manager first.');
-    process.exit(1);
+    // Container doesn't exist - offer standalone mode
+    console.log('[claudo] Manager container not found.');
+    console.log('[claudo] Starting in standalone mode to monitor subagent sessions...');
+    
+    const sessionDir = getSessionDirectory();
+    if (sessionDir) {
+      console.log('[claudo] Monitoring for subagent sessions...');
+      console.log('[claudo] Press Ctrl+C to stop.');
+      monitorSubagentSessions(sessionDir);
+      
+      // Keep process running
+      setInterval(() => {}, 1000);
+    } else {
+      console.error('[claudo] No Claude project directory found.');
+      console.error('[claudo] Use "claudo up" to start the manager.');
+      process.exit(1);
+    }
   }
 }
 

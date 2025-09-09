@@ -1,0 +1,60 @@
+task: "Multi-Agent System Test - Complete workflow validation"
+priority: high
+estimated_effort: "30-45 minutes"
+dependencies: ["docker-container", "claudo-build", "git-repo"]
+
+analysis:
+  current_state: "Full Claudo system is built and ready with Manager, Planner, Worker, Critic agents defined"
+  requirements: "Need to validate complete multi-agent workflow from task queue to code completion"
+  approach: "Execute a simple but complete development task through the full agent pipeline"
+
+implementation_steps:
+  - step: "Prepare test environment"
+    files: [".claudo/queue.txt"]
+    type: "modify"
+    description: "Add test task to queue system for Manager to pick up"
+
+  - step: "Execute multi-agent workflow"
+    files: ["system logs", "docker containers"]
+    type: "monitor"
+    description: "Start Manager and monitor agent spawning, communication, and execution"
+
+  - step: "Validate Planner agent"
+    files: ["planning/tasks/calculator-task/"]
+    type: "verify"
+    description: "Confirm Planner creates proper implementation plan with file changes and steps"
+
+  - step: "Validate Worker agent"
+    files: ["src/", "test/"]
+    type: "verify"
+    description: "Confirm Worker executes planned changes and creates calculator function with test"
+
+  - step: "Validate Critic agent"
+    files: ["review reports", "validation results"]
+    type: "verify"
+    description: "Confirm Critic reviews implementation and validates correctness"
+
+  - step: "Verify git integration"
+    files: ["git history"]
+    type: "verify"
+    description: "Confirm all changes are committed automatically with proper messages"
+
+  - step: "Document results"
+    files: ["planning/tasks/test/test-results.md"]
+    type: "create"
+    description: "Record test execution results, agent behavior, and any issues found"
+
+testing_strategy:
+  - "Monitor system logs for agent communication"
+  - "Verify each agent completes without errors"
+  - "Test generated calculator function works correctly"
+  - "Validate git commits have proper structure"
+  - "Check Docker container cleanup"
+
+completion_criteria:
+  - "Manager successfully orchestrates full workflow"
+  - "All agents complete their designated roles"
+  - "Calculator function works and has tests"
+  - "Git history shows proper commit sequence"
+  - "No hanging processes or containers"
+  - "Test results documented with lessons learned"

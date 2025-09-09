@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'child_process';
-import { writeFileSync, mkdirSync, readFileSync } from 'fs';
+import { writeFileSync, mkdirSync, readFileSync, readdirSync, statSync } from 'fs';
 import * as path from 'path';
 import { PromptResolver } from './prompt-resolver';
 import { ExecutionContext, getPreferredContext } from './execution-context';
@@ -72,10 +72,13 @@ function spawnAgent() {
   // Read the prompt file content to pipe via stdin
   const promptContent = readFileSync(tempPromptFile, 'utf8');
   
-  // Use stdin to avoid shell expansion issues with prompts containing '--' 
+  // Strategy: Use --output-format stream-json with --verbose to get session tracking
+  // BUT we'll capture the stream-json to a temp file and extract just the text response
   const claudeArgs = [
     '--dangerously-skip-permissions',
-    '--model', 'sonnet'
+    '--model', 'sonnet',
+    '--output-format', 'stream-json',
+    '--verbose'  // Required with stream-json to get session ID
   ];
 
   // Spawn Claude process - no shell needed since we're not using shell expansion
@@ -85,36 +88,98 @@ function spawnAgent() {
   });
   
   let sessionId = '';
-  let responseBuffer = '';
+  let projectPath = '';
+  let jsonBuffer = '';  // Collect JSON stream output
+  let textResponse = '';  // Final text response to return
   
-  // Capture session ID from stderr (if verbose mode enabled)
+  // With stream-json, the session file is automatically created
+  // We need to find it by monitoring the project directory
+  const projectDir = path.join(
+    process.env.HOME || '',
+    '.claude',
+    'projects',
+    process.cwd().replace(/\//g, '-')
+  );
+  
+  // Capture stderr for any errors
   claude.stderr?.on('data', (data) => {
     const output = data.toString();
-    
-    // Try to extract session ID
-    const sessionMatch = output.match(/Session ID: ([a-f0-9-]+)/);
-    if (sessionMatch) {
-      sessionId = sessionMatch[1];
-      // Write session ID to temp file for monitoring
-      const sessionFile = path.join(claudoDir, `${agentType}-session.txt`);
-      writeFileSync(sessionFile, sessionId);
+    if (process.env.DEBUG_AGENT) {
+      console.error(`[agent-debug] Stderr: ${output}`);
     }
   });
   
-  // Buffer stdout for clean text response
+  // Parse JSON stream to extract text response and find session file
   claude.stdout?.on('data', (data) => {
-    responseBuffer += data.toString();
+    jsonBuffer += data.toString();
+    const lines = jsonBuffer.split('\n');
+    jsonBuffer = lines.pop() || ''; // Keep incomplete line
+    
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const msg = JSON.parse(line);
+        // Extract text content from assistant messages
+        if (msg.type === 'assistant' && msg.message?.content) {
+          for (const content of msg.message.content) {
+            if (content.type === 'text' && content.text) {
+              textResponse += content.text;
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
   });
   
   // Write prompt to stdin and close it
   claude.stdin?.write(promptContent);
   claude.stdin?.end();
   
-  claude.on('close', (code) => {
-    // Output clean response
-    if (responseBuffer) {
-      process.stdout.write(responseBuffer);
+  claude.on('close', async (code) => {
+    // Output the clean text response (not JSON)
+    if (textResponse) {
+      process.stdout.write(textResponse);
     }
+    
+    // Find the session file that was just created
+    try {
+      mkdirSync(projectDir, { recursive: true });
+      const files = readdirSync(projectDir)
+        .filter(f => f.endsWith('.jsonl'))
+        .map(f => ({
+          name: f,
+          path: path.join(projectDir, f),
+          mtime: statSync(path.join(projectDir, f)).mtime
+        }))
+        .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+      
+      if (files.length > 0) {
+        // Most recent file is likely our session
+        sessionId = files[0].name.replace('.jsonl', '');
+        
+        // Write metadata for logs monitoring
+        const metadataFile = path.join(claudoDir, `${agentType}-metadata.json`);
+        writeFileSync(metadataFile, JSON.stringify({
+          sessionId,
+          projectPath: projectDir,
+          agentType,
+          timestamp: new Date().toISOString(),
+          sessionFile: files[0].path
+        }, null, 2));
+        
+        if (process.env.DEBUG_AGENT) {
+          console.error(`[agent-debug] Session found: ${sessionId}`);
+          console.error(`[agent-debug] Session file: ${files[0].path}`);
+        }
+      }
+    } catch (e) {
+      if (process.env.DEBUG_AGENT) {
+        console.error(`[agent-debug] Failed to find session: ${e}`);
+      }
+    }
+    
     process.exit(code || 0);
   });
   
