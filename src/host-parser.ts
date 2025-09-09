@@ -54,9 +54,9 @@ export class HostDockerParser {
       this.tailProcess = spawn('bash', ['-c', `tail -f ${this.outputFile}`], {
         stdio: ['ignore', 'pipe', 'pipe']
       });
-
+	let debugLoggingOn = false;
       // Pipe tail output through our parser with monitoring
-      if (this.tailProcess.stdout) {
+      if (debugLoggingOn && this.tailProcess.stdout) {
         // Monitor data flow
         this.tailProcess.stdout.on('data', (chunk) => {
           this.lastDataTime = Date.now();
