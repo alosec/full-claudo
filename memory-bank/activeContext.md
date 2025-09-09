@@ -34,44 +34,31 @@ Successfully implemented `--prompt-file` functionality for agent commands:
 ✅ **Manager spawning working**: Manager can spawn agents using `node dist/src/agent.js plan "task"`
 ✅ **Critical solution found**: Direct node calls bypass claudo routing and work perfectly in container
 
-## Interactive Manager Mode - IMPLEMENTED (2025-09-09)
+## Interactive Manager Mode - BLOCKED (2025-09-09)
 
-### Problem Solved
-Previous attempts at subagent visibility were too complex:
-- Session file monitoring had timing issues
-- Log multiplexing was fragile
-- JSON stream parsing created context pollution
+### Current Status: TTY/Raw Mode Incompatibility
+Attempted to implement interactive Manager mode (`claudo up -it`) but hit fundamental blocker:
 
-### Solution: Interactive Manager (`claudo up -it`)
-Implemented a simpler, more powerful approach:
+#### The Problem
+1. **Claude CLI requires raw TTY mode** for interactive sessions (uses Ink library)
+2. **Docker stdio pipes don't support raw mode** properly
+3. **Result**: Error "Raw mode is not supported on the current process.stdin"
 
-#### What It Does
-- Launches Manager as interactive Claude Code session
-- Runs Docker container with `-it` flag for terminal attachment
-- Bypasses JSON streaming in favor of direct Claude interface
-- Provides full visibility into Manager's tool use and subagent calls
+#### Attempted Solutions (All Failed)
+1. **Direct stdio inherit**: Claude crashes with raw mode error
+2. **Using --print flag**: Works but makes it non-interactive (single response only)
+3. **Using script command**: Not available in minimal Docker container
+4. **Pseudo-TTY via script**: Would need to install additional tools in container
 
-#### How to Use
-```bash
-# Start interactive Manager
-claudo up -it
+#### Root Cause
+The Claude Code CLI is designed for direct terminal use and expects full TTY capabilities. Docker's `-it` flag provides some TTY emulation but not enough for Claude's Ink-based UI which requires raw mode control.
 
-# In the Manager session, spawn subagents:
-# Use Bash tool: node dist/src/agent.js plan "task"
-# Use Bash tool: node dist/src/agent.js worker "implement feature"
-```
-
-#### Implementation Details
-1. **CLI** (`src/cli.ts`): Added `-it` flag parsing, sets `CLAUDO_INTERACTIVE` env var
-2. **Up Command** (`src/up.ts`): Detects interactive mode, uses `docker run -it --rm` instead of `-d`
-3. **Manager Runner** (`src/manager-runner.ts`): Switches between JSON streaming (normal) and direct Claude (interactive)
-
-#### Benefits Achieved
-- ✅ Direct visibility into Manager operations
-- ✅ Real-time debugging of subagent spawning
-- ✅ No complex log parsing needed
-- ✅ Native Claude Code interface with full tool visibility
-- ✅ Can manually test and debug agent coordination
+#### Next Steps for New Session
+Consider alternative approaches:
+1. **Run Manager on host** (not in Docker) for `-it` mode
+2. **Create verbose debug mode** that logs all Manager decisions without interactivity
+3. **Install necessary TTY tools** in Docker image (script, socat, etc.)
+4. **Use different CLI approach** that doesn't require raw mode
 
 ## Previous Attempts Summary
 

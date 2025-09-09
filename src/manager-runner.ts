@@ -32,11 +32,12 @@ function runManager() {
   let spawnOptions: any;
   
   if (isInteractive) {
-    // Interactive mode: Direct Claude Code session
-    command = `cat "${promptFile}" | claude --dangerously-skip-permissions --model sonnet`;
+    // Interactive mode: Use script to provide pseudo-TTY for Claude's raw mode
+    // The script command creates a pseudo-terminal that satisfies Claude's TTY requirements
+    command = `script -q -c "cat '${promptFile}' | claude --dangerously-skip-permissions --model sonnet" /dev/null`;
     console.log('[claudo] Starting interactive Manager session...');
-    console.log('[claudo] You can now interact directly with the Manager agent.');
-    console.log('[claudo] Use the Bash tool to spawn subagents: node dist/src/agent.js [type] "task"');
+    console.log('[claudo] Using pseudo-TTY to enable Claude interactive mode.');
+    console.log('[claudo] You can interact with the Manager agent below.');
     console.log('');
     
     spawnOptions = {
