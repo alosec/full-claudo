@@ -33,18 +33,26 @@ export class HostDockerParser {
     return new Promise((resolve, reject) => {
       console.log(`[claudo] Following manager output from file: ${this.outputFile}`);
       
+      const debugLoggingOn = false;
+      
       // Start health monitoring
       this.healthMonitor = setInterval(() => {
         const timeSinceData = Date.now() - this.lastDataTime;
         if (timeSinceData > 15000) { // 15 seconds without data
-          console.error(`[claudo] Warning: No data from tail for ${Math.floor(timeSinceData / 1000)}s`);
-          console.error(`[claudo] Bytes read so far: ${this.bytesRead}`);
+          if (debugLoggingOn) {
+            console.error(`[claudo] Warning: No data from tail for ${Math.floor(timeSinceData / 1000)}s`);
+            console.error(`[claudo] Bytes read so far: ${this.bytesRead}`);
+            
+            // Check if tail process is still alive
+            if (this.tailProcess && !this.tailProcess.killed) {
+              console.error(`[claudo] Tail process is still running (PID: ${this.tailProcess.pid})`);
+            } else {
+              console.error(`[claudo] Tail process appears to be dead`);
+            }
+          }
           
-          // Check if tail process is still alive
-          if (this.tailProcess && !this.tailProcess.killed) {
-            console.error(`[claudo] Tail process is still running (PID: ${this.tailProcess.pid})`);
-          } else {
-            console.error(`[claudo] Tail process appears to be dead`);
+          // Always restart tail process if it's dead, regardless of debug setting
+          if (!this.tailProcess || this.tailProcess.killed) {
             this.restartTail();
           }
         }
@@ -54,8 +62,6 @@ export class HostDockerParser {
       this.tailProcess = spawn('bash', ['-c', `tail -f ${this.outputFile}`], {
         stdio: ['ignore', 'pipe', 'pipe']
       });
-      
-      const debugLoggingOn = false;
       
       // Pipe tail output through our parser with monitoring
       if (this.tailProcess.stdout) {
