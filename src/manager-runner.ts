@@ -3,14 +3,19 @@
 import { spawn } from 'child_process';
 import { readFileSync, writeFileSync, mkdirSync, createWriteStream } from 'fs';
 import * as path from 'path';
+import { detectContext, resolveWorkingDirectory, resolvePromptPath, ExecutionContext } from './execution-context';
 
 // Run Manager Claude within container - supports JSON streaming, debug, and interactive modes
-function runManager() {
+async function runManager() {
   const isInteractive = process.env.CLAUDO_INTERACTIVE === 'true';
   const isDebug = process.env.CLAUDO_DEBUG === 'true';
-  const workDir = '/workspace';
+  const isTesting = process.env.TESTING_MODE === 'true' || process.argv.includes('--testing');
+  
+  // Detect execution context and resolve paths accordingly
+  const context = detectContext();
+  const workDir = resolveWorkingDirectory(context);
   const claudoDir = path.join(workDir, '.claudo');
-  const managerSystemPrompt = path.join(workDir, 'prompts', 'manager.md');
+  const managerSystemPrompt = resolvePromptPath('manager.md', context);
   
   // Ensure .claudo directory exists
   try {
@@ -18,9 +23,23 @@ function runManager() {
   } catch (e) {}
   
   // Prepare the prompt
-  const systemPrompt = readFileSync(managerSystemPrompt, 'utf-8');
-  const taskPrompt = 'Act as Manager Claude and coordinate the work.';
-  const fullPrompt = `${taskPrompt}\n\n---\n\n${systemPrompt}`;
+  let fullPrompt: string;
+  
+  if (isTesting && process.argv.includes('--prompt-stdin')) {
+    console.log('[claudo] Starting Manager in testing mode with stdin prompt...');
+    
+    // Read test prompt from stdin
+    fullPrompt = '';
+    for await (const chunk of process.stdin) {
+      fullPrompt += chunk;
+    }
+    console.error('[claudo] DEBUG: Read test prompt from stdin, length:', fullPrompt.length);
+  } else {
+    // Normal mode - read manager.md
+    const systemPrompt = readFileSync(managerSystemPrompt, 'utf-8');
+    const taskPrompt = 'Act as Manager Claude and coordinate the work.';
+    fullPrompt = `${taskPrompt}\n\n---\n\n${systemPrompt}`;
+  }
   
   // Save prompt for debugging
   const promptFile = path.join(claudoDir, 'manager-prompt.txt');
@@ -141,5 +160,8 @@ if (require.main === module) {
   } else {
     console.error('[claudo] Starting Manager with streaming JSON bus...');
   }
-  runManager();
+  runManager().catch(err => {
+    console.error('[claudo] Manager error:', err);
+    process.exit(1);
+  });
 }

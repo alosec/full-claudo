@@ -13,9 +13,12 @@
     "logs": "claudo logs",
     "postinstall": "npm run build",
     "test:parser": "npm run build && node dist/test/parser.test.js",
-    "test:manager": "npm run build && node dist/src/test-manager.js",
+    "test:manager": "./tests/run-test.sh test-manager-hello",
+    "test:manager-calls-planner": "./tests/run-test.sh test-manager-calls-planner",
+    "test:planner-direct": "./tests/run-test.sh test-planner-direct",
     "test:complex": "npm run build && node dist/src/test-manager-complex.js",
-    "test": "npm run test:parser"
+    "test": "npm run test:parser",
+    "test:all": "npm run test:manager && npm run test:manager-calls-planner"
   },
   "keywords": ["claude", "multi-agent", "automation"],
   "author": "Alex",
