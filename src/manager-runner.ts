@@ -6,6 +6,8 @@ import * as path from 'path';
 import { detectContext, resolveWorkingDirectory, resolvePromptPath, ExecutionContext } from './execution-context';
 
 // Run Manager Claude within container - supports JSON streaming, debug, and interactive modes
+// This is now primarily used by 'claudo up' for long-running orchestration
+// For one-shot Manager commands, use manager.ts instead
 async function runManager() {
   const isInteractive = process.env.CLAUDO_INTERACTIVE === 'true';
   const isDebug = process.env.CLAUDO_DEBUG === 'true';

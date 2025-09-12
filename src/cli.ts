@@ -106,6 +106,49 @@ switch (command) {
     showStatus().catch(console.error);
     break;
 
+  case 'manager':
+    // Manager runs similar to other agents but with its own entry point
+    const managerArgs = [scriptPath('manager.js')];
+    
+    // Add mode flags
+    if (debugMode) {
+      managerArgs.push('--debug');
+    }
+    if (interactiveMode) {
+      managerArgs.push('--interactive');
+    }
+    if (printMode) {
+      managerArgs.push('--print');
+    }
+    
+    // Add execution context if specified
+    if (executionMode) {
+      managerArgs.push('--execution-mode', executionMode);
+    }
+    
+    // Add prompt file if specified
+    if (promptFile) {
+      managerArgs.push('--prompt-file', promptFile);
+    }
+    
+    // Add remaining user arguments (including direct prompt after -p)
+    managerArgs.push(...args);
+
+    const managerProcess = spawn('node', managerArgs, {
+      stdio: 'inherit',
+      shell: false
+    });
+
+    managerProcess.on('error', (error) => {
+      console.error('[claudo] Error starting manager:', error.message);
+      process.exit(1);
+    });
+
+    managerProcess.on('exit', (code) => {
+      process.exit(code || 0);
+    });
+    break;
+
   case 'plan':
   case 'worker':
   case 'critic':

@@ -11,22 +11,19 @@ echo "Time: $(date -Iseconds)"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
 
-# Test 1: Manager runs in Docker with print mode
+# Test 1: Manager runs with direct prompt
 test_manager_docker() {
-  echo "[TEST 1] Manager in Docker with -p flag"
+  echo "[TEST 1] Manager with direct prompt (-p flag)"
   echo "─────────────────────────────────────────────────────────────"
   
   # Create a simple test prompt
-  cat > .claudo/test-prompt.txt << 'EOF'
-Write a haiku about Docker containers.
-Format as three lines.
-Start with "DOCKER HAIKU:" then the haiku.
-EOF
+  TEST_PROMPT="Write a haiku about Docker containers. Format as three lines. Start with 'DOCKER HAIKU:' then the haiku."
   
-  echo "[INFO] Starting Manager in Docker with print mode..."
+  echo "[INFO] Starting Manager with direct prompt..."
+  echo "[INFO] This should complete within 30 seconds"
   
-  # Run Manager in Docker with -p flag for single response
-  OUTPUT=$(cat .claudo/test-prompt.txt | claudo up -p 2>&1 || true)
+  # Run Manager with direct prompt
+  OUTPUT=$(timeout 30 claudo manager -p "$TEST_PROMPT" 2>&1 || true)
   
   echo "$OUTPUT"
   
@@ -42,27 +39,34 @@ EOF
   fi
 }
 
-# Test 2: Manager in Docker spawns Planner agent
+# Test 2: Manager spawns Planner agent
 test_manager_spawns_planner() {
   echo ""
-  echo "[TEST 2] Manager in Docker spawns Planner agent"
+  echo "[TEST 2] Manager spawns Planner agent"
   echo "─────────────────────────────────────────────────────────────"
   
-  # Create test prompt that instructs Manager to spawn Planner
-  cat > .claudo/test-spawn.txt << 'EOF'
+  # Create test prompt file for spawning
+  cat > tests/prompts/test-spawn.md << 'EOF'
+# Test: Manager Spawns Planner
+
 Your task:
 1. Say "MANAGER: Starting agent spawn test"
 2. Use the Bash tool to run this exact command:
-   node /workspace/dist/src/agent.js plan --print "Write a haiku about planning" 2>&1
+   node dist/src/agent.js plan --print "Write a haiku about planning" 2>&1
 3. Capture the output from the command
 4. Say "MANAGER: Received response from Planner"
 5. Include the actual haiku you received
 EOF
   
-  echo "[INFO] Starting Manager in Docker to spawn Planner..."
+  echo "[INFO] Starting Manager to spawn Planner..."
+  echo "[INFO] Using test prompt that instructs spawning"
+  echo "[INFO] This may take 45+ seconds"
   
-  # Run Manager in Docker with -p flag
-  OUTPUT=$(cat .claudo/test-spawn.txt | claudo up -p 2>&1 || true)
+  # Run Manager with prompt file
+  OUTPUT=$(timeout 60 claudo manager --prompt-file tests/prompts/test-spawn.md --print 2>&1 || true)
+  
+  # Clean up
+  rm -f tests/prompts/test-spawn.md
   
   echo "$OUTPUT"
   
@@ -92,7 +96,7 @@ EOF
   
   echo ""
   if [ $CHECKS -eq 3 ]; then
-    echo "✅ TEST 2 PASSED: Manager successfully spawned Planner in Docker"
+    echo "✅ TEST 2 PASSED: Manager successfully spawned Planner"
     return 0
   else
     echo "❌ TEST 2 FAILED: Only $CHECKS/3 checks passed"
