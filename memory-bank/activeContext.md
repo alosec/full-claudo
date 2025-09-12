@@ -1,9 +1,31 @@
 # Active Context
 
 ## Current Phase
-✅ TESTING FRAMEWORK OPERATIONAL: First End-to-End Test Working (2025-09-11)
+✅ MULTI-AGENT ORCHESTRATION PROVEN: Manager → Planner Flow Working (2025-09-12)
 
-## Latest Achievement: Testing Framework (2025-09-11)
+## Latest Achievement: Testable Manager Command (2025-09-12)
+
+### Breakthrough: `claudo manager` Command Implemented
+✅ **Manager is now testable** with clean, one-shot execution modes:
+- `claudo manager -p "prompt"` - Direct prompt execution with clean output
+- `claudo manager -it` - Interactive mode (launches Claude Code)
+- `claudo manager --test` - Test mode with simplified responses
+- `claudo manager --prompt-file file.md` - Custom prompt from file
+
+### Key Architectural Decision
+**Separated concerns correctly:**
+- `claudo up` - Reserved for future long-running orchestrator (the "marshmallow 5 feet high")
+- `claudo manager` - Current reality for testable, observable Manager execution
+- Removed nonsensical `claudo up -p` combination
+
+### Test Results: Multi-Agent Orchestration Confirmed
+✅ **Test 1**: Manager responds with haiku (direct execution)
+✅ **Test 2**: Manager spawns Planner agent which generates different haiku
+- Two separate Claude API calls working in sequence
+- Manager receives and relays Planner's output correctly
+- Proves the orchestration mechanism works end-to-end
+
+## Previous Achievement: Testing Framework (2025-09-11)
 
 ### What's Working NOW
 ✅ **`npm run test:manager` CONFIRMED WORKING** - First meaningful end-to-end test!
@@ -28,12 +50,21 @@
 ✅ **Haiku test validates real API calls** - Each run generates unique creative response
 ✅ **Test infrastructure proven** - Observable, verifiable end-to-end testing works
 
-### Next Initiative
-**Test Manager → Planner Agent Spawning**
-- Design test where Manager spawns a Planner agent
-- Verify the spawn command is executed correctly
-- Capture and validate Planner's response
-- Prove multi-agent orchestration actually works
+### Next Initiative: Full Orchestration with Visibility
+**Goal**: Run `claudo up` and observe the complete multi-agent flow with proper visibility
+
+**The Challenge**:
+- Manager needs to spawn agents that output JSON streams (for session tracking)
+- Manager should only receive clean text responses (avoid context pollution)
+- Host needs to watch all agent sessions in real-time (parse JSON streams)
+- Sessions should be tracked in `~/.claude/projects/` (volumed out from container)
+
+**Architecture Needed**:
+1. **Manager runs with stream-json** → outputs to `.claudo/manager-output.jsonl`
+2. **Spawned agents run with stream-json** → output to `.claudo/sessions/[agent-type]-[timestamp].jsonl`
+3. **Host parser watches all JSONL files** → displays parsed, color-coded activity
+4. **Manager uses --print when spawning** → receives only clean text responses
+5. **Session tracking** → All activity preserved for debugging and analysis
 
 ## Previous Updates: Custom Prompt File Support
 Successfully implemented `--prompt-file` functionality for agent commands:
