@@ -9,6 +9,7 @@ import { detectContext, resolveWorkingDirectory, resolvePromptPath, ExecutionCon
 async function runManager() {
   const isInteractive = process.env.CLAUDO_INTERACTIVE === 'true';
   const isDebug = process.env.CLAUDO_DEBUG === 'true';
+  const isPrint = process.env.CLAUDO_PRINT === 'true';
   const isTesting = process.env.TESTING_MODE === 'true' || process.argv.includes('--testing');
   
   // Detect execution context and resolve paths accordingly
@@ -61,6 +62,19 @@ async function runManager() {
     
     spawnOptions = {
       stdio: 'inherit',  // Direct terminal I/O for debug mode
+      env: {
+        ...process.env,
+        NODE_ENV: 'production'
+      }
+    };
+  } else if (isPrint) {
+    // Print mode: Use --print flag for single clean response
+    command = `claude --dangerously-skip-permissions --model sonnet --print --prompt "$(cat '${promptFile}')"`;
+    console.log('[claudo] Starting Manager in print mode...');
+    console.log('[claudo] Manager will process once with clean output.\n');
+    
+    spawnOptions = {
+      stdio: 'inherit',  // Direct terminal I/O for print mode
       env: {
         ...process.env,
         NODE_ENV: 'production'
@@ -152,11 +166,14 @@ async function runManager() {
 if (require.main === module) {
   const isInteractive = process.env.CLAUDO_INTERACTIVE === 'true';
   const isDebug = process.env.CLAUDO_DEBUG === 'true';
+  const isPrint = process.env.CLAUDO_PRINT === 'true';
   
   if (isInteractive) {
     console.log('[claudo] Starting Manager in interactive mode...');
   } else if (isDebug) {
     console.log('[claudo] Starting Manager in debug mode...');
+  } else if (isPrint) {
+    console.log('[claudo] Starting Manager in print mode...');
   } else {
     console.error('[claudo] Starting Manager with streaming JSON bus...');
   }

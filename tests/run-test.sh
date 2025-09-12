@@ -46,15 +46,25 @@ run_test() {
       echo "[EXEC] Running Manager with hello world prompt..."
       echo ""
       # Run manager directly with test prompt
-      cat "$test_prompt" | node dist/src/manager-runner.js --testing --prompt-stdin 2>&1 || true
+      if [ "$PARSED_OUTPUT" = "true" ]; then
+        # Use parser for clean output
+        cat "$test_prompt" | node dist/src/manager-runner.js --testing --prompt-stdin 2>&1 | node dist/src/test-parser.js || true
+      else
+        # Raw output
+        cat "$test_prompt" | node dist/src/manager-runner.js --testing --prompt-stdin 2>&1 || true
+      fi
       ;;
       
     test-manager-calls-planner)
       echo "[EXEC] Running Manager to call Planner..."
+      echo "[INFO] This test validates the Manager can spawn and communicate with a Planner agent"
       echo ""
-      # First ensure planner test mode is ready
-      export PLANNER_TEST_MODE=true
-      cat "$test_prompt" | node dist/src/manager-runner.js --testing --prompt-stdin 2>&1 || true
+      # Run manager with test prompt - it will use Bash tool to spawn planner
+      if [ "$PARSED_OUTPUT" = "true" ]; then
+        cat "$test_prompt" | node dist/src/manager-runner.js --testing --prompt-stdin 2>&1 | node dist/src/test-parser.js || true
+      else
+        cat "$test_prompt" | node dist/src/manager-runner.js --testing --prompt-stdin 2>&1 || true
+      fi
       ;;
       
     test-planner-direct)
@@ -88,11 +98,20 @@ echo "════════════════════════�
 
 case "$TEST_NAME" in
   test-manager-hello)
-    if grep -q "MANAGER: Hello World - I am operational" "$OUTPUT_FILE"; then
-      echo "✅ Manager responded correctly"
-      RESULT=0
+    if grep -q "MANAGER HAIKU:" "$OUTPUT_FILE"; then
+      # Count lines after "MANAGER HAIKU:" that are not empty
+      HAIKU_LINES=$(sed -n '/MANAGER HAIKU:/,$ p' "$OUTPUT_FILE" | tail -n +2 | grep -v '^$' | head -3 | wc -l)
+      if [ "$HAIKU_LINES" -eq 3 ]; then
+        echo "✅ Manager generated a 3-line haiku"
+        echo "📝 Haiku content:"
+        sed -n '/MANAGER HAIKU:/,$ p' "$OUTPUT_FILE" | tail -n +2 | head -3 | sed 's/^/   /'
+        RESULT=0
+      else
+        echo "❌ Manager response was not a proper 3-line haiku (found $HAIKU_LINES lines)"
+        RESULT=1
+      fi
     else
-      echo "❌ Manager did not respond with expected message"
+      echo "❌ Manager did not respond with 'MANAGER HAIKU:' header"
       RESULT=1
     fi
     ;;
@@ -106,28 +125,24 @@ case "$TEST_NAME" in
       echo "❌ Manager did not start properly"
     fi
     
-    if grep -q "agent.js" "$OUTPUT_FILE"; then
-      echo "✅ Spawn command detected"
+    if grep -q "node.*agent.js plan" "$OUTPUT_FILE"; then
+      echo "✅ Spawn command executed (node .../agent.js plan)"
       ((CHECKS++))
     else
       echo "❌ No spawn command found"
     fi
     
-    if grep -q "PLANNER: Hello from Planner" "$OUTPUT_FILE"; then
-      echo "✅ Planner responded"
+    if grep -q "MANAGER: Received planner response:" "$OUTPUT_FILE"; then
+      echo "✅ Manager received and reported Planner's response"
+      # Extract and show the planner's haiku
+      echo "📝 Planner's response:"
+      sed -n '/MANAGER: Received planner response:/p' "$OUTPUT_FILE" | sed 's/MANAGER: Received planner response://' | sed 's/^/   /'
       ((CHECKS++))
     else
-      echo "❌ No planner response detected"
+      echo "❌ Manager did not report receiving Planner response"
     fi
     
-    if grep -q "MANAGER: Received response from Planner" "$OUTPUT_FILE"; then
-      echo "✅ Manager confirmed receipt"
-      ((CHECKS++))
-    else
-      echo "❌ Manager did not confirm"
-    fi
-    
-    if [ $CHECKS -eq 4 ]; then
+    if [ $CHECKS -eq 3 ]; then
       RESULT=0
     else
       RESULT=1

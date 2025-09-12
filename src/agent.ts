@@ -72,14 +72,26 @@ function spawnAgent() {
   // Read the prompt file content to pipe via stdin
   const promptContent = readFileSync(tempPromptFile, 'utf8');
   
-  // Strategy: Use --output-format stream-json with --verbose to get session tracking
-  // BUT we'll capture the stream-json to a temp file and extract just the text response
-  const claudeArgs = [
-    '--dangerously-skip-permissions',
-    '--model', 'sonnet',
-    '--output-format', 'stream-json',
-    '--verbose'  // Required with stream-json to get session ID
-  ];
+  // Check if we're being called with --print flag (e.g., by Manager)
+  const isPrint = process.argv.includes('--print') || process.env.CLAUDO_AGENT_PRINT === 'true';
+  
+  let claudeArgs: string[];
+  if (isPrint) {
+    // Print mode: Single clean response for Manager consumption
+    claudeArgs = [
+      '--dangerously-skip-permissions',
+      '--model', 'sonnet',
+      '--print'
+    ];
+  } else {
+    // Default: Use stream-json for session tracking and monitoring
+    claudeArgs = [
+      '--dangerously-skip-permissions',
+      '--model', 'sonnet',
+      '--output-format', 'stream-json',
+      '--verbose'  // Required with stream-json to get session ID
+    ];
+  }
 
   // Spawn Claude process - no shell needed since we're not using shell expansion
   const claude = spawn('claude', claudeArgs, {
@@ -109,26 +121,32 @@ function spawnAgent() {
     }
   });
   
-  // Parse JSON stream to extract text response and find session file
+  // Handle output based on mode
   claude.stdout?.on('data', (data) => {
-    jsonBuffer += data.toString();
-    const lines = jsonBuffer.split('\n');
-    jsonBuffer = lines.pop() || ''; // Keep incomplete line
-    
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const msg = JSON.parse(line);
-        // Extract text content from assistant messages
-        if (msg.type === 'assistant' && msg.message?.content) {
-          for (const content of msg.message.content) {
-            if (content.type === 'text' && content.text) {
-              textResponse += content.text;
+    if (isPrint) {
+      // In print mode, stdout is the direct text response
+      textResponse += data.toString();
+    } else {
+      // Parse JSON stream to extract text response and find session file
+      jsonBuffer += data.toString();
+      const lines = jsonBuffer.split('\n');
+      jsonBuffer = lines.pop() || ''; // Keep incomplete line
+      
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+          // Extract text content from assistant messages
+          if (msg.type === 'assistant' && msg.message?.content) {
+            for (const content of msg.message.content) {
+              if (content.type === 'text' && content.text) {
+                textResponse += content.text;
+              }
             }
           }
+        } catch (e) {
+          // Ignore parse errors
         }
-      } catch (e) {
-        // Ignore parse errors
       }
     }
   });

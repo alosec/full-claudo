@@ -12,6 +12,7 @@ interface ParsedArgs {
   executionMode?: ExecutionContext;
   debugMode?: boolean;
   interactiveMode?: boolean;
+  printMode?: boolean;
   remainingArgs: string[];
 }
 
@@ -39,6 +40,8 @@ function parseArgs(): ParsedArgs {
       result.debugMode = true;
     } else if (arg === '-it' || arg === '--interactive') {
       result.interactiveMode = true;
+    } else if (arg === '-p' || arg === '--print') {
+      result.printMode = true;
     } else {
       result.remainingArgs.push(arg);
     }
@@ -47,7 +50,7 @@ function parseArgs(): ParsedArgs {
   return result;
 }
 
-const { command, promptFile, executionMode, debugMode, interactiveMode, remainingArgs: args } = parseArgs();
+const { command, promptFile, executionMode, debugMode, interactiveMode, printMode, remainingArgs: args } = parseArgs();
 
 const scriptPath = (script: string) => join(__dirname, script);
 
@@ -59,6 +62,9 @@ switch (command) {
     } else if (interactiveMode) {
       console.log('[claudo] Starting Manager in interactive mode...');
       process.env.CLAUDO_INTERACTIVE = 'true';
+    } else if (printMode) {
+      console.log('[claudo] Starting Manager in print mode (single response)...');
+      process.env.CLAUDO_PRINT = 'true';
     } else {
       console.log('[claudo] Starting Manager...');
     }

@@ -12,6 +12,7 @@ async function spawnManager() {
   const containerName = 'claudo-manager';
   const isInteractive = process.env.CLAUDO_INTERACTIVE === 'true';
   const isDebug = process.env.CLAUDO_DEBUG === 'true';
+  const isPrint = process.env.CLAUDO_PRINT === 'true';
   
   // Ensure Docker is available
   if (!ensureDockerAvailable()) {
@@ -69,6 +70,33 @@ async function spawnManager() {
       // Ctrl+C or exit is normal, only report real errors
       if (error.status !== 130 && error.status !== 0) {
         console.error('[claudo] Error in debug session:', error.message);
+        process.exit(1);
+      }
+    }
+  } else if (isPrint) {
+    // Print mode: Run with -it for single response (like debug but cleaner output)
+    const cmd = `docker run -it --rm --name ${containerName} \
+      -v "$(pwd):/workspace" \
+      -v "$HOME/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro" \
+      -v "$HOME/.claude/settings.json:/home/node/.claude/settings.json:ro" \
+      -w /workspace \
+      -e CLAUDO_PRINT=true \
+      claudo-container \
+      node /workspace/dist/src/manager-runner.js`;
+    
+    console.log('[claudo] Starting Manager in print mode...');
+    console.log('[claudo] Manager will process once with clean output.\n');
+    
+    try {
+      // Run interactively - this will attach to current terminal
+      execSync(cmd, { 
+        stdio: 'inherit',
+        cwd: process.cwd() 
+      });
+    } catch (error: any) {
+      // Ctrl+C or exit is normal, only report real errors
+      if (error.status !== 130 && error.status !== 0) {
+        console.error('[claudo] Error in print session:', error.message);
         process.exit(1);
       }
     }
