@@ -16,6 +16,9 @@
     "test:manager": "./tests/run-test.sh test-manager-hello",
     "test:manager-calls-planner": "./tests/run-test.sh test-manager-calls-planner",
     "test:planner-direct": "./tests/run-test.sh test-planner-direct",
+    "test:docker": "./tests/test-docker.sh",
+    "test:docker:manager": "./tests/test-docker.sh test_manager_docker",
+    "test:docker:spawn": "./tests/test-docker.sh test_manager_spawns_planner",
     "test:complex": "npm run build && node dist/src/test-manager-complex.js",
     "test": "npm run test:parser",
     "test:all": "npm run test:manager && npm run test:manager-calls-planner"

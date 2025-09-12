@@ -54,7 +54,7 @@ async function runManager() {
   
   if (isDebug) {
     // Debug mode: Use --print flag for single response with full visibility
-    command = `claude --dangerously-skip-permissions --model sonnet --print --prompt "$(cat '${promptFile}')"`;
+    command = `cat "${promptFile}" | claude --dangerously-skip-permissions --model sonnet --print`;
     console.log('[claudo] Starting Manager in debug mode...');
     console.log('[claudo] Manager will process the full prompt and show its reasoning.');
     console.log('[claudo] Note: This is a single-response mode for debugging.');
@@ -69,7 +69,7 @@ async function runManager() {
     };
   } else if (isPrint) {
     // Print mode: Use --print flag for single clean response
-    command = `claude --dangerously-skip-permissions --model sonnet --print --prompt "$(cat '${promptFile}')"`;
+    command = `cat "${promptFile}" | claude --dangerously-skip-permissions --model sonnet --print`;
     console.log('[claudo] Starting Manager in print mode...');
     console.log('[claudo] Manager will process once with clean output.\n');
     
@@ -120,7 +120,7 @@ async function runManager() {
   // Spawn the command in container context
   const manager = spawn('bash', ['-c', command], spawnOptions);
   
-  if (!isInteractive && !isDebug) {
+  if (!isInteractive && !isDebug && !isPrint) {
     // Set up output logging to capture clean JSON stream (non-interactive only)
     const outputLogPath = path.join(claudoDir, 'manager-output.jsonl');
     const outputStream = createWriteStream(outputLogPath, { flags: 'a' });

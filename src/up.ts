@@ -46,8 +46,10 @@ async function spawnManager() {
   mkdirSync(claudoDir, { recursive: true });
   
   if (isDebug) {
-    // Debug mode: Run with -it for single response with full output
-    const cmd = `docker run -it --rm --name ${containerName} \
+    // Debug mode: Run with -i (and -t only if TTY available)
+    const isTTY = process.stdin.isTTY;
+    const dockerFlags = isTTY ? '-it' : '-i';
+    const cmd = `docker run ${dockerFlags} --rm --name ${containerName} \
       -v "$(pwd):/workspace" \
       -v "$HOME/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro" \
       -v "$HOME/.claude/settings.json:/home/node/.claude/settings.json:ro" \
@@ -74,8 +76,10 @@ async function spawnManager() {
       }
     }
   } else if (isPrint) {
-    // Print mode: Run with -it for single response (like debug but cleaner output)
-    const cmd = `docker run -it --rm --name ${containerName} \
+    // Print mode: Run with -i (and -t only if TTY available)
+    const isTTY = process.stdin.isTTY;
+    const dockerFlags = isTTY ? '-it' : '-i';
+    const cmd = `docker run ${dockerFlags} --rm --name ${containerName} \
       -v "$(pwd):/workspace" \
       -v "$HOME/.claude/.credentials.json:/home/node/.claude/.credentials.json:ro" \
       -v "$HOME/.claude/settings.json:/home/node/.claude/settings.json:ro" \
